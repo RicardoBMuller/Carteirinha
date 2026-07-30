@@ -1,25 +1,15 @@
 {
-  "name": "Portal Acadêmico Particular",
+  "name": "Portal Acadêmico - Carteirinha",
   "short_name": "Carteirinha",
-  "description": "Portal particular para carteirinha e organização acadêmica.",
+  "description": "Portal particular para carteirinha acadêmica virtual.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "background_color": "#eef8ff",
+  "theme_color": "#eef8ff",
   "orientation": "portrait-primary",
-  "background_color": "#edf8ff",
-  "theme_color": "#0f4f82",
   "icons": [
-    {
-      "src": "assets/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "assets/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ]
 }

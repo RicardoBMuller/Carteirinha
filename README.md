@@ -1,111 +1,99 @@
-# Portal Acadêmico Particular
+# Portal Acadêmico — Carteirinhas V2
 
-Primeira versão de um portal mobile-first para uso particular, com visual inspirado na identidade azul-clara da Cruzeiro do Sul Virtual e navegação em formato de aplicativo.
+Portal particular para exibir duas carteirinhas estudantis separadas por conta Google.
 
-## O que já está incluído
+## Alterações desta versão
 
-- Login com Google preparado para Supabase.
-- Modo demonstração para testar imediatamente, mesmo sem configurar banco.
-- Navegação inferior com **Cursos**, **Atividades**, **Carteirinha**, **Dúvidas** e **Perfil**.
-- Avatar do perfil Google no quinto botão.
-- Template de carteirinha com campos editáveis:
-  - Nome do aluno;
-  - Curso;
-  - Validade;
-  - Universidade.
-- Upload de uma foto da carteirinha para uso como fundo.
-- Dados separados por usuário quando o Supabase estiver configurado.
-- Banco com RLS e Storage privado.
-- PWA instalável no celular e no computador.
-- Projeto estático, pronto para GitHub Pages.
+- a carteirinha agora é vertical, inspirada no modelo da Cruzeiro do Sul Virtual;
+- não existe mais upload da imagem inteira da carteirinha;
+- o upload serve somente para a foto do estudante;
+- a foto é exibida no quadrado central da carteirinha;
+- a edição foi movida integralmente para o botão **Perfil**;
+- campos editáveis: Nome do Aluno, Curso, Matrícula/RGM e Validade;
+- a instituição permanece fixa como **Cruzeiro do Sul Virtual**;
+- o avatar do menu inferior continua usando a foto da conta Google;
+- cada conta acessa somente a própria carteirinha.
 
-## Testar rapidamente
+## Reutilização do Portal FCC
 
-1. Extraia o ZIP.
-2. Abra a pasta no VS Code.
-3. Use a extensão **Live Server** e abra o arquivo `index.html`.
-4. Na tela inicial, escolha **Visualizar demonstração**.
+Não é necessário criar outro projeto no Google Cloud e nem outro projeto no Supabase.
 
-O modo demonstração salva os dados apenas no `localStorage` do navegador.
+O `index.html` carrega diretamente o arquivo público:
 
-## Ativar login Google e sincronização
+`https://ricardobmuller.github.io/Portal-FCC/config.js`
 
-### 1. Criar o projeto no Supabase
+O arquivo `js/config.js` reutiliza:
 
-Crie um projeto no Supabase e abra o **SQL Editor**.
+- `SUPABASE_URL`;
+- `SUPABASE_PUBLISHABLE_KEY` ou a antiga `SUPABASE_ANON_KEY`.
 
-### 2. Criar banco e Storage
+O Google Client ID e o Google Client Secret continuam somente no Supabase. Eles não são colocados neste projeto.
 
-Execute todo o conteúdo do arquivo:
+## 1. Atualizar o mesmo Supabase
 
-```text
-supabase/schema.sql
-```
+Abra o projeto **calculadora-fcc** e entre em:
 
-Esse arquivo cria:
+`SQL Editor > New query`
 
-- tabela `student_cards`;
-- políticas RLS;
-- bucket privado `student-cards`;
-- políticas para cada usuário acessar apenas sua própria imagem.
+Execute todo o arquivo:
 
-### 3. Configurar o Google
+`supabase/ATUALIZAR_MESMO_BANCO_FCC.sql`
 
-No Supabase:
+O arquivo é não destrutivo. Ele não apaga nem altera projetos, salas, cartões de prova ou dados do Kanban.
 
-1. Acesse **Authentication > Providers > Google**;
-2. habilite o provedor;
-3. informe o Client ID e Client Secret do Google Cloud;
-4. em **Authentication > URL Configuration**, adicione a URL do GitHub Pages em **Redirect URLs**.
+Ele cria somente:
 
-Exemplo:
+- tabela `public.fcc_student_cards`;
+- bucket privado `fcc-student-card-photos`;
+- políticas RLS para cada usuário acessar somente os próprios dados.
 
-```text
-https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/
-```
+## 2. Adicionar a nova URL no Supabase Auth
 
-### 4. Preencher as chaves
+No mesmo projeto Supabase, abra:
 
-Abra `js/config.js` e informe:
+`Authentication > URL Configuration`
 
-```javascript
-window.PORTAL_CONFIG = {
-  SUPABASE_URL: "https://SEU-PROJETO.supabase.co",
-  SUPABASE_ANON_KEY: "SUA_CHAVE_ANON"
-};
-```
+Não é necessário substituir a Site URL atual do Portal FCC.
 
-A chave `anon` pode ficar no frontend. A proteção dos dados é feita pelas políticas RLS do Supabase. Nunca coloque a chave `service_role` no projeto.
+Em **Redirect URLs**, adicione a URL final deste novo GitHub Pages. Exemplo:
 
-## Publicar no GitHub Pages
+`https://ricardobmuller.github.io/Portal-Carteirinhas/**`
 
-1. Crie um repositório no GitHub.
-2. Envie todos os arquivos mantendo a estrutura de pastas.
-3. Abra **Settings > Pages**.
-4. Em **Build and deployment**, escolha **Deploy from a branch**.
-5. Selecione a branch `main` e a pasta `/root`.
-6. Salve e aguarde a publicação.
+Para teste local com Live Server, mantenha ou adicione:
 
-Depois, adicione a URL publicada às URLs autorizadas do Supabase e do Google OAuth.
+- `http://127.0.0.1:5500/**`
+- `http://localhost:5500/**`
+
+## 3. Google Cloud
+
+Não crie outro projeto e não crie outro OAuth Client.
+
+A origem autorizada já utilizada continua a mesma:
+
+`https://ricardobmuller.github.io`
+
+A callback do Google continua sendo a mesma callback do projeto Supabase `calculadora-fcc`.
+
+## 4. Publicar no GitHub Pages
+
+Envie todos os arquivos deste ZIP para a raiz do novo repositório.
+
+Depois abra:
+
+`Settings > Pages`
+
+Configure:
+
+- Source: `Deploy from a branch`;
+- Branch: `main`;
+- Folder: `/(root)`.
 
 ## Estrutura
 
-```text
-portal_carteirinhas_cruzeiro_v1/
-├── assets/
-├── css/
-│   └── styles.css
-├── js/
-│   ├── app.js
-│   └── config.js
-├── supabase/
-│   └── schema.sql
-├── index.html
-├── manifest.webmanifest
-├── sw.js
-└── README.md
-```
-
-## Observação sobre a imagem enviada
-
-A imagem pessoal usada como referência não foi incluída dentro do projeto. Ao abrir o portal, cada pessoa pode fazer o próprio upload pelo botão **Enviar foto da carteirinha**.
+- `index.html` — telas e template vertical;
+- `css/styles.css` — identidade visual e responsividade;
+- `js/app.js` — login, navegação, edição, banco e upload da foto;
+- `js/config.js` — ponte para reutilizar o config do Portal FCC;
+- `supabase/ATUALIZAR_MESMO_BANCO_FCC.sql` — migração não destrutiva;
+- `supabase/VERIFICAR_INSTALACAO.sql` — conferência opcional;
+- `manifest.webmanifest` e `sw.js` — instalação como PWA.

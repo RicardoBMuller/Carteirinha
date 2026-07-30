@@ -1,12 +1,29 @@
 /**
- * CONFIGURAÇÃO DO SUPABASE
+ * Este projeto reutiliza o config.js público do Portal FCC.
+ * O index.html carrega primeiro:
+ * https://ricardobmuller.github.io/Portal-FCC/config.js
  *
- * 1. Crie um projeto em https://supabase.com
- * 2. Execute o arquivo supabase/schema.sql no SQL Editor.
- * 3. Ative o provedor Google em Authentication > Providers.
- * 4. Preencha os valores abaixo.
+ * Assim, o Portal de Carteirinhas utiliza o MESMO Supabase e o MESMO
+ * login Google já configurado no projeto calculadora-fcc.
+ *
+ * Fallback: para testar sem acesso ao Portal FCC, preencha os dois campos
+ * abaixo com os mesmos valores do config.js que já funciona.
  */
-window.PORTAL_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: ""
-};
+(() => {
+  "use strict";
+
+  const shared = window.FCC_CONFIG || {};
+  const fallback = {
+    SUPABASE_URL: "",
+    SUPABASE_PUBLISHABLE_KEY: ""
+  };
+
+  window.PORTAL_CONFIG = Object.freeze({
+    SUPABASE_URL: shared.SUPABASE_URL || fallback.SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY:
+      shared.SUPABASE_PUBLISHABLE_KEY ||
+      shared.SUPABASE_ANON_KEY ||
+      fallback.SUPABASE_PUBLISHABLE_KEY,
+    USING_SHARED_FCC_CONFIG: Boolean(shared.SUPABASE_URL)
+  });
+})();

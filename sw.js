@@ -1,10 +1,10 @@
-const CACHE_NAME = "portal-academico-v1";
-const APP_FILES = [
+const CACHE_NAME = "portal-carteirinhas-v2.0";
+const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css",
-  "./js/config.js",
-  "./js/app.js",
+  "./css/styles.css?v=2.0",
+  "./js/config.js?v=2.0",
+  "./js/app.js?v=2.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
   "./assets/icon-192.png",
@@ -12,7 +12,7 @@ const APP_FILES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_FILES)));
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(LOCAL_ASSETS)));
   self.skipWaiting();
 });
 
@@ -24,12 +24,14 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-      return response;
-    }).catch(() => caches.match("./index.html")))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("./index.html")))
   );
 });
