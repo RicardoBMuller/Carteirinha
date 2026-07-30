@@ -275,7 +275,7 @@
     setAvatar(els.profileAvatarLarge, avatarUrl, fallback);
     els.profileName.textContent = displayName;
     els.profileEmail.textContent = email;
-    els.storageMode.textContent = isDemo ? "Neste navegador" : "Supabase calculadora-fcc";
+    els.storageMode.textContent = isDemo ? "Neste navegador" : "Conta online";
     els.syncBadge.textContent = isDemo ? "Local" : "Sincronizado";
   }
 
@@ -388,7 +388,7 @@
     if (error) {
       console.warn("Falha ao carregar a carteirinha:", error.message);
       els.syncBadge.textContent = "Somente local";
-      showToast("Execute o SQL do ZIP no mesmo Supabase do Portal FCC.");
+      showToast("Não foi possível carregar os dados online. Verifique a configuração do projeto.");
       return;
     }
 
@@ -755,7 +755,7 @@
 
   async function signInWithGoogle() {
     if (!supabaseClient) {
-      showToast("Não foi possível ler a configuração do Portal FCC.");
+      showToast("Não foi possível carregar a configuração de acesso.");
       return;
     }
 
@@ -854,7 +854,7 @@
       script.src = src;
       script.async = true;
       script.onload = resolve;
-      script.onerror = () => reject(new Error("Falha ao carregar a biblioteca Supabase."));
+      script.onerror = () => reject(new Error("Falha ao carregar a biblioteca de autenticação."));
       document.head.appendChild(script);
     });
   }
@@ -884,8 +884,8 @@
     });
 
     els.authHint.textContent = config.USING_SHARED_FCC_CONFIG
-      ? "Conectado ao mesmo Supabase do Portal FCC."
-      : "Conectado pela configuração local de fallback.";
+      ? "Acesso online conectado."
+      : "Configuração de acesso carregada.";
 
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session?.user) await enterSession(session.user, false);

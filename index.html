@@ -8,7 +8,7 @@
   <title>Portal Acadêmico</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/styles.css?v=4.0">
+  <link rel="stylesheet" href="css/styles.css?v=5.0">
 </head>
 <body>
   <div class="app-shell" id="appShell" hidden>
@@ -178,11 +178,11 @@
           </details>
           <details>
             <summary>Preciso criar outro login Google?</summary>
-            <p>Não. O portal reutiliza o mesmo Google OAuth e o mesmo projeto Supabase do Portal FCC.</p>
+            <p>Não. Basta entrar normalmente com sua conta Google.</p>
           </details>
           <details>
             <summary>Os dados de cada pessoa ficam separados?</summary>
-            <p>Sim. Cada conta Google só visualiza e altera a própria carteirinha por meio das políticas RLS do Supabase.</p>
+            <p>Sim. Cada conta Google acessa e altera somente a própria carteirinha.</p>
           </details>
         </div>
       </section>
@@ -307,13 +307,13 @@
       <div class="auth-brand-logo"><img id="authUniversityLogo" src="assets/brands/cruzeiro.svg" alt=""></div>
       <p class="eyebrow">PORTAL PARTICULAR</p>
       <h1>Carteirinha acadêmica sempre à mão.</h1>
-      <p>Entre com a mesma conta Google utilizada no Portal FCC.</p>
+      <p>Entre com sua conta Google para acessar sua carteirinha.</p>
       <button class="google-button" id="googleLoginButton" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.35 12.2c0-.65-.06-1.14-.18-1.66H12v3.32h5.38a4.6 4.6 0 01-2 3.02l-.02.11 2.9 2.25.2.02c1.84-1.7 2.89-4.2 2.89-7.06z"/><path fill="#34A853" d="M12 21.75c2.62 0 4.82-.86 6.43-2.49l-3.08-2.38c-.82.56-1.9.95-3.35.95-2.52 0-4.66-1.7-5.43-4.05l-.1.01-3.01 2.33-.04.1A9.72 9.72 0 0012 21.75z"/><path fill="#FBBC05" d="M6.57 13.78A5.86 5.86 0 016.25 12c0-.62.11-1.22.3-1.78l-.01-.12-3.05-2.37-.1.05A9.7 9.7 0 002.25 12c0 1.56.37 3.03 1.17 4.22l3.15-2.44z"/><path fill="#EA4335" d="M12 6.17c1.82 0 3.05.78 3.75 1.43l2.75-2.68C16.8 3.33 14.62 2.25 12 2.25a9.72 9.72 0 00-8.58 5.53l3.13 2.44C7.34 7.87 9.48 6.17 12 6.17z"/></svg>
         Entrar com Google
       </button>
       <button class="demo-button" id="demoLoginButton" type="button">Visualizar demonstração</button>
-      <small class="auth-hint" id="authHint">Carregando a configuração compartilhada do Portal FCC…</small>
+      <small class="auth-hint" id="authHint">Carregando a configuração de acesso…</small>
     </div>
   </div>
 
@@ -355,9 +355,8 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
-  <!-- Reutiliza o MESMO config.js já publicado pelo Portal FCC. -->
   <script src="https://ricardobmuller.github.io/Portal-FCC/config.js"></script>
-  <script src="js/config.js?v=4.0"></script>
-  <script src="js/app.js?v=4.0"></script>
+  <script src="js/config.js?v=5.0"></script>
+  <script src="js/app.js?v=5.0"></script>
 </body>
 </html>
