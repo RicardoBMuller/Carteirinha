@@ -1,10 +1,10 @@
-const CACHE_NAME = "portal-carteirinhas-v5-limpo";
+const CACHE_NAME = "portal-carteirinhas-v6-login-google";
 const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css?v=5.0",
-  "./js/config.js?v=5.0",
-  "./js/app.js?v=5.0",
+  "./css/styles.css?v=6.0",
+  "./js/config.js?v=6.0",
+  "./js/app.js?v=6.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
   "./assets/brands/cruzeiro.svg",

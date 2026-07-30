@@ -66,7 +66,6 @@
     appShell: document.getElementById("appShell"),
     authScreen: document.getElementById("authScreen"),
     googleLoginButton: document.getElementById("googleLoginButton"),
-    demoLoginButton: document.getElementById("demoLoginButton"),
     authHint: document.getElementById("authHint"),
     headerSubtitle: document.getElementById("headerSubtitle"),
     backButton: document.getElementById("backButton"),
@@ -121,7 +120,6 @@
 
   let supabaseClient = null;
   let currentUser = null;
-  let isDemo = false;
   let currentView = "courses";
   let cardData = { ...DEFAULT_CARD };
   let toastTimer = null;
@@ -158,7 +156,7 @@
   }
 
   function localKey() {
-    return `portal-carteirinhas-v2:${isDemo ? "demo" : currentUser?.id || "guest"}`;
+    return `portal-carteirinhas-v2:${currentUser?.id || "guest"}`;
   }
 
   function initials(name) {
@@ -264,19 +262,17 @@
 
   function renderUser() {
     const metadata = currentUser?.user_metadata || {};
-    const displayName = isDemo
-      ? "Modo demonstração"
-      : metadata.full_name || metadata.name || currentUser?.email?.split("@")[0] || "Estudante";
-    const email = isDemo ? "modo@demonstracao.local" : currentUser?.email || "";
-    const avatarUrl = isDemo ? "" : metadata.avatar_url || metadata.picture || "";
+    const displayName = metadata.full_name || metadata.name || currentUser?.email?.split("@")[0] || "Estudante";
+    const email = currentUser?.email || "";
+    const avatarUrl = metadata.avatar_url || metadata.picture || "";
     const fallback = initials(displayName);
 
     setAvatar(els.navAvatar, avatarUrl, fallback);
     setAvatar(els.profileAvatarLarge, avatarUrl, fallback);
     els.profileName.textContent = displayName;
     els.profileEmail.textContent = email;
-    els.storageMode.textContent = isDemo ? "Neste navegador" : "Conta online";
-    els.syncBadge.textContent = isDemo ? "Local" : "Sincronizado";
+    els.storageMode.textContent = "Conta online";
+    els.syncBadge.textContent = "Sincronizado";
   }
 
   function fillProfileForm() {
@@ -377,7 +373,7 @@
   }
 
   async function loadRemote() {
-    if (!supabaseClient || !currentUser || isDemo) return;
+    if (!supabaseClient || !currentUser) return;
 
     const { data, error } = await supabaseClient
       .from(TABLE_NAME)
@@ -415,7 +411,7 @@
   }
 
   async function saveRemote() {
-    if (!supabaseClient || !currentUser || isDemo) return true;
+    if (!supabaseClient || !currentUser) return false;
 
     const payload = {
       user_id: currentUser.id,
@@ -446,7 +442,7 @@
     saveLocal();
     const synced = await saveRemote();
     renderCard();
-    showToast(synced || isDemo ? successMessage : "Salvo somente neste navegador.");
+    showToast(synced ? successMessage : "Salvo somente neste navegador.");
     return synced;
   }
 
@@ -618,7 +614,7 @@
   async function saveCroppedPhoto(blob, dataUrl) {
     syncCardDataFromProfileForm();
 
-    if (isDemo || !supabaseClient || !currentUser) {
+    if (!supabaseClient || !currentUser) {
       cardData.localPhoto = dataUrl;
       cardData.photoPath = "";
       cardData.photoUrl = "";
@@ -714,7 +710,7 @@
   async function removePhoto() {
     try {
       syncCardDataFromProfileForm();
-      if (!isDemo && supabaseClient && currentUser && cardData.photoPath) {
+      if (supabaseClient && currentUser && cardData.photoPath) {
         const { error } = await supabaseClient.storage
           .from(STORAGE_BUCKET)
           .remove([cardData.photoPath]);
@@ -745,11 +741,10 @@
     els.appShell.hidden = true;
   }
 
-  async function enterSession(user, demo = false) {
+  async function enterSession(user) {
     currentUser = user;
-    isDemo = demo;
     loadLocal();
-    if (!demo) await loadRemote();
+    await loadRemote();
     showApp();
   }
 
@@ -772,9 +767,8 @@
   }
 
   async function logout() {
-    if (!isDemo && supabaseClient) await supabaseClient.auth.signOut();
+    if (supabaseClient) await supabaseClient.auth.signOut();
     currentUser = null;
-    isDemo = false;
     const rememberedUniversity = normalizeUniversity(localStorage.getItem("portal-carteirinhas:last-university"));
     cardData = { ...DEFAULT_CARD, university: rememberedUniversity };
     applyUniversityTheme(rememberedUniversity, false);
@@ -787,7 +781,6 @@
     els.backButton.addEventListener("click", () => navigate("courses"));
     els.notificationButton.addEventListener("click", () => showToast("Nenhuma nova notificação no momento."));
     els.googleLoginButton.addEventListener("click", signInWithGoogle);
-    els.demoLoginButton.addEventListener("click", () => enterSession({ id: "demo", email: "modo@demonstracao.local", user_metadata: {} }, true));
     els.logoutButton.addEventListener("click", logout);
     els.universitySelect.addEventListener("change", () => {
       cardData.university = normalizeUniversity(els.universitySelect.value);
@@ -888,11 +881,11 @@
       : "Configuração de acesso carregada.";
 
     const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session?.user) await enterSession(session.user, false);
+    if (session?.user) await enterSession(session.user);
 
     supabaseClient.auth.onAuthStateChange((event, sessionData) => {
       if (event === "SIGNED_IN" && sessionData?.user && currentUser?.id !== sessionData.user.id) {
-        enterSession(sessionData.user, false);
+        enterSession(sessionData.user);
       }
       if (event === "SIGNED_OUT") showAuth();
     });

@@ -1,4 +1,4 @@
-# Portal Acadêmico Multiuniversidades — V5
+# Portal Acadêmico Multiuniversidades — V6
 
 Portal particular de carteirinhas estudantis com login Google e identidade visual dinâmica.
 
@@ -16,7 +16,7 @@ A escolha altera imediatamente as cores, os fundos, os botões, o menu inferior,
 
 ## Recursos
 
-- login com conta Google;
+- acesso exclusivamente com login Google;
 - dados individuais para cada usuário;
 - edição de nome, curso, RGM e validade;
 - geração aleatória do RGM;
