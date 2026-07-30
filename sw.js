@@ -1,10 +1,10 @@
-const CACHE_NAME = "portal-carteirinhas-v7-busca-universidade";
+const CACHE_NAME = "portal-carteirinhas-v8-busca-universidade-aprimorada";
 const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css?v=7.0",
-  "./js/config.js?v=7.0",
-  "./js/app.js?v=7.0",
+  "./css/styles.css?v=8.0",
+  "./js/config.js?v=8.0",
+  "./js/app.js?v=8.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
   "./assets/icon-192.png",
@@ -40,13 +40,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (/wikimedia\.org$|wikidata\.org$/i.test(requestUrl.hostname) || /\.wikimedia\.org$/i.test(requestUrl.hostname)) {
+  const externalHosts = /(^|\.)(wikimedia\.org|wikidata\.org|wikipedia\.org|microlink\.io|google\.com|duckduckgo\.com)$/i;
+  if (externalHosts.test(requestUrl.hostname)) {
     event.respondWith(
-      caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      }))
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
   }
 });

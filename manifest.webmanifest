@@ -1,7 +1,7 @@
 {
   "name": "Portal Acadêmico",
   "short_name": "Carteirinhas",
-  "description": "Carteirinha acadêmica com busca online e identidade visual dinâmica por universidade.",
+  "description": "Carteirinha acadêmica com busca aprimorada, consulta ao site oficial e identidade visual dinâmica por universidade.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

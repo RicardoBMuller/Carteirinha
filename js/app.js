@@ -6,7 +6,27 @@
   const CROP_OUTPUT_SIZE = 900;
   const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
   const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
+  const WIKIPEDIA_APIS = Object.freeze([
+    { language: "pt", endpoint: "https://pt.wikipedia.org/w/api.php" },
+    { language: "en", endpoint: "https://en.wikipedia.org/w/api.php" }
+  ]);
+  const MICROLINK_API = "https://api.microlink.io/";
   const GENERIC_LOGO = "assets/favicon.svg";
+  const BRAND_LOOKUP_CACHE = new Map();
+  const EDUCATION_WORDS = /\b(universidade|universitário|universitaria|faculdade|centro universitário|instituição de ensino|ensino superior|university|college|higher education|school)\b/i;
+  const LOGO_WORDS = /\b(logo|logotipo|logomarca|wordmark|brand|marca|emblem|emblema|symbol|símbolo)\b/i;
+  const PHOTO_WORDS = /\b(campus|prédio|predio|building|biblioteca|library|teatro|theatre|fachada|foto|photograph|aerial|vista|sala|classroom)\b/i;
+  const SEARCH_HINTS = Object.freeze([
+    {
+      keys: ["anhembi", "anhembi morumbi", "universidade anhembi morumbi", "uam"],
+      canonicalName: "Universidade Anhembi Morumbi",
+      aliases: ["Anhembi Morumbi", "UAM"],
+      website: "https://portal.anhembi.br/",
+      claimedColor: "#00a98f",
+      palette: ["#00a98f", "#007f76", "#454545"],
+      description: "Universidade privada de ensino superior em São Paulo"
+    }
+  ]);
 
   const DEFAULT_COLORS = Object.freeze({
     primary: "#155a91",
@@ -456,8 +476,80 @@
     return entity?.claims?.[property]?.[0]?.mainsnak?.datavalue?.value ?? null;
   }
 
+  function claimValues(entity, property) {
+    return (entity?.claims?.[property] || [])
+      .map((claim) => claim?.mainsnak?.datavalue?.value)
+      .filter((value) => value !== undefined && value !== null);
+  }
+
   function localizedValue(collection, fallback = "") {
     return collection?.["pt-br"]?.value || collection?.pt?.value || collection?.en?.value || fallback;
+  }
+
+  function localizedAliases(collection) {
+    const aliases = [];
+    ["pt-br", "pt", "en"].forEach((language) => {
+      (collection?.[language] || []).forEach((item) => {
+        const value = String(item?.value || "").trim();
+        if (value && !aliases.some((alias) => alias.toLocaleLowerCase("pt-BR") === value.toLocaleLowerCase("pt-BR"))) aliases.push(value);
+      });
+    });
+    return aliases;
+  }
+
+  function normalizeSearchText(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function uniqueText(values) {
+    const seen = new Set();
+    return values.filter((value) => {
+      const clean = String(value || "").replace(/\s+/g, " ").trim();
+      const key = normalizeSearchText(clean);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function institutionHint(query) {
+    const normalized = normalizeSearchText(query);
+    return SEARCH_HINTS.find((hint) => hint.keys.some((key) => {
+      const normalizedKey = normalizeSearchText(key);
+      if (normalized === normalizedKey) return true;
+      if (normalized.length < 5 || normalizedKey.length < 5) return false;
+      return normalized.includes(normalizedKey) || normalizedKey.includes(normalized);
+    })) || null;
+  }
+
+  function buildSearchVariants(query) {
+    const clean = String(query || "").replace(/["'`]/g, " ").replace(/\s+/g, " ").trim();
+    const variants = [clean];
+    const normalized = normalizeSearchText(clean);
+    const genericPattern = /\b(universidade|faculdade|centro universitario|instituto|escola|university|college)\b/i;
+    if (!genericPattern.test(normalized)) {
+      variants.push(`Universidade ${clean}`, `Faculdade ${clean}`, `Centro Universitário ${clean}`);
+    } else {
+      const stripped = clean
+        .replace(/\b(universidade|faculdade|centro universitário|centro universitario|instituto|escola|university|college)\b/gi, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (stripped.length >= 2) variants.push(stripped);
+    }
+    const hint = institutionHint(clean);
+    if (hint) variants.push(hint.canonicalName, ...(hint.aliases || []));
+    return uniqueText(variants).slice(0, 6);
+  }
+
+  function searchTokens(value) {
+    const stopWords = new Set(["universidade", "universitario", "universitaria", "faculdade", "centro", "instituto", "escola", "university", "college", "de", "da", "do", "das", "dos", "e", "ead"]);
+    return normalizeSearchText(value).split(" ").filter((token) => token.length > 1 && !stopWords.has(token));
   }
 
   async function mediaWikiRequest(endpoint, params, signal) {
@@ -472,6 +564,29 @@
     return data;
   }
 
+  async function jsonRequest(url, signal, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const relayAbort = () => controller.abort();
+    signal?.addEventListener("abort", relayAbort, { once: true });
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        mode: "cors",
+        credentials: "omit",
+        headers: { Accept: "application/json" }
+      });
+      if (!response.ok) throw new Error(`Serviço de identidade visual indisponível (${response.status}).`);
+      return await response.json();
+    } catch (error) {
+      if (signal?.aborted) throw new DOMException("Busca cancelada", "AbortError");
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+      signal?.removeEventListener("abort", relayAbort);
+    }
+  }
+
   function fileTitleKey(value) {
     return String(value || "").replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
   }
@@ -483,7 +598,7 @@
       action: "query",
       prop: "imageinfo",
       titles: names.map((name) => `File:${name}`).join("|"),
-      iiprop: "url|mime",
+      iiprop: "url|mime|size|mediatype",
       iiurlwidth: 900
     }, signal);
     const map = new Map();
@@ -494,96 +609,481 @@
         title: page.title,
         url: info.thumburl || info.url || "",
         originalUrl: info.url || "",
-        mime: info.thumbmime || info.mime || ""
+        mime: info.thumbmime || info.mime || "",
+        width: info.thumbwidth || info.width || 0,
+        height: info.thumbheight || info.height || 0,
+        source: "Wikimedia Commons"
       });
     });
     return map;
   }
 
-  async function searchCommonsLogos(name, signal) {
-    const cleanName = String(name || "").replace(/["']/g, " ").trim();
-    if (!cleanName) return [];
-    const searches = [`intitle:"${cleanName}" logo`, `"${cleanName}" logotipo`, `"${cleanName}" logo`];
+  function scoreLogoFile(item, institutionNames) {
+    const title = normalizeSearchText(item.title);
+    const tokens = searchTokens(institutionNames.join(" "));
+    const tokenMatches = tokens.filter((token) => title.includes(token)).length;
+    let score = tokenMatches * 14;
+    if (LOGO_WORDS.test(item.title)) score += 90;
+    if (/\.svg$/i.test(item.title) || /svg/i.test(item.mime || "")) score += 28;
+    else if (/\.png$/i.test(item.title) || /png/i.test(item.mime || "")) score += 16;
+    else if (/\.jpe?g$/i.test(item.title)) score -= 15;
+    if (PHOTO_WORDS.test(item.title)) score -= 100;
+    if (!LOGO_WORDS.test(item.title) && tokenMatches < Math.min(2, tokens.length)) score -= 45;
+    return score;
+  }
+
+  async function searchCommonsLogos(name, aliases = [], commonsCategory = "", signal) {
+    const institutionNames = uniqueText([name, ...aliases]).slice(0, 4);
+    if (!institutionNames.length) return [];
     const found = new Map();
-    for (const query of searches) {
+
+    const collectPages = (pages) => {
+      Object.values(pages || {}).forEach((page) => {
+        const info = page.imageinfo?.[0];
+        const url = info?.thumburl || info?.url || "";
+        const mime = info?.thumbmime || info?.mime || "";
+        if (!url || !/^image\//.test(mime || "image/")) return;
+        const item = {
+          title: page.title,
+          url,
+          originalUrl: info.url || url,
+          mime,
+          width: info.thumbwidth || info.width || 0,
+          height: info.thumbheight || info.height || 0,
+          source: "Wikimedia Commons"
+        };
+        item.score = scoreLogoFile(item, institutionNames);
+        const key = fileTitleKey(page.title);
+        if (item.score >= 45 && (!found.has(key) || found.get(key).score < item.score)) found.set(key, item);
+      });
+    };
+
+    for (const institutionName of institutionNames.slice(0, 3)) {
+      const cleanName = institutionName.replace(/["']/g, " ").trim();
+      const searches = [
+        `intitle:"${cleanName}" logo`,
+        `"${cleanName}" logotipo`,
+        `"${cleanName}" wordmark`
+      ];
+      for (const query of searches) {
+        try {
+          const data = await mediaWikiRequest(COMMONS_API, {
+            action: "query",
+            generator: "search",
+            gsrsearch: query,
+            gsrnamespace: 6,
+            gsrlimit: 10,
+            prop: "imageinfo",
+            iiprop: "url|mime|size|mediatype",
+            iiurlwidth: 900
+          }, signal);
+          collectPages(data.query?.pages);
+        } catch (error) {
+          if (error.name === "AbortError") throw error;
+          console.warn("Busca complementar de logo:", error.message);
+        }
+        if (found.size >= 7) break;
+      }
+      if (found.size >= 7) break;
+    }
+
+    if (commonsCategory) {
       try {
         const data = await mediaWikiRequest(COMMONS_API, {
           action: "query",
-          generator: "search",
-          gsrsearch: query,
-          gsrnamespace: 6,
-          gsrlimit: 8,
+          generator: "categorymembers",
+          gcmtitle: `Category:${commonsCategory}`,
+          gcmtype: "file",
+          gcmlimit: 30,
           prop: "imageinfo",
-          iiprop: "url|mime",
+          iiprop: "url|mime|size|mediatype",
           iiurlwidth: 900
         }, signal);
-        Object.values(data.query?.pages || {}).forEach((page) => {
-          const info = page.imageinfo?.[0];
-          const url = info?.thumburl || info?.url || "";
-          if (!url || !/^image\//.test(info?.thumbmime || info?.mime || "image/")) return;
-          const key = fileTitleKey(page.title);
-          if (!found.has(key)) found.set(key, { title: page.title, url, originalUrl: info.url || url });
-        });
+        collectPages(data.query?.pages);
       } catch (error) {
         if (error.name === "AbortError") throw error;
-        console.warn("Busca complementar de logo:", error.message);
+        console.warn("Categoria de logos:", error.message);
       }
-      if (found.size >= 5) break;
     }
-    return [...found.values()].slice(0, 5);
+
+    return [...found.values()].sort((a, b) => b.score - a.score).slice(0, 6);
   }
 
-  function parseSearchEntity(entity, searchItem, logoMap) {
+  async function searchWikipediaPages(queryVariants, signal) {
+    const pagesByEntity = new Map();
+    const plans = [];
+    WIKIPEDIA_APIS.forEach((api) => {
+      queryVariants.slice(0, 2).forEach((query, index) => plans.push({ ...api, query, rank: index }));
+    });
+
+    const responses = await Promise.allSettled(plans.map(async (plan) => {
+      const data = await mediaWikiRequest(plan.endpoint, {
+        action: "query",
+        generator: "search",
+        gsrsearch: plan.query,
+        gsrnamespace: 0,
+        gsrlimit: 8,
+        prop: "pageprops|pageimages|extracts|info",
+        ppprop: "wikibase_item",
+        piprop: "thumbnail|name",
+        pithumbsize: 900,
+        exintro: 1,
+        explaintext: 1,
+        inprop: "url",
+        redirects: 1
+      }, signal);
+      return { plan, pages: Object.values(data.query?.pages || {}) };
+    }));
+
+    responses.forEach((response) => {
+      if (response.status !== "fulfilled") return;
+      const { plan, pages } = response.value;
+      pages.forEach((page) => {
+        const entityId = page.pageprops?.wikibase_item;
+        if (!entityId) return;
+        const current = pagesByEntity.get(entityId);
+        const entry = {
+          entityId,
+          pageTitle: page.title || "",
+          pageUrl: safeRemoteUrl(page.fullurl),
+          pageImageUrl: safeRemoteUrl(page.thumbnail?.source),
+          pageImageName: page.pageimage || "",
+          extract: String(page.extract || "").trim(),
+          language: plan.language,
+          rank: plan.rank
+        };
+        if (!current || entry.rank < current.rank || (entry.language === "pt" && current.language !== "pt")) pagesByEntity.set(entityId, entry);
+      });
+    });
+    return pagesByEntity;
+  }
+
+  function entityIdClaims(entity, property) {
+    return claimValues(entity, property)
+      .map((value) => (typeof value === "object" ? value.id : ""))
+      .filter(Boolean);
+  }
+
+  function parseSearchEntity(entity, meta, logoMap) {
     const logoFile = claimValue(entity, "P154");
     const colorClaim = claimValue(entity, "P465");
-    const website = claimValue(entity, "P856") || "";
+    const website = meta?.hint?.website || claimValue(entity, "P856") || "";
     const logoInfo = logoFile ? logoMap.get(fileTitleKey(logoFile)) : null;
-    const name = localizedValue(entity.labels, searchItem?.label || entity.id);
+    const name = localizedValue(entity.labels, meta?.searchItem?.label || meta?.wikiPage?.pageTitle || entity.id);
+    const aliases = uniqueText([
+      ...localizedAliases(entity.aliases),
+      ...(meta?.hint?.aliases || []),
+      meta?.wikiPage?.pageTitle || ""
+    ]).filter((alias) => normalizeSearchText(alias) !== normalizeSearchText(name));
+    const description = localizedValue(
+      entity.descriptions,
+      meta?.wikiPage?.extract?.split(/(?<=[.!?])\s+/)[0] || meta?.searchItem?.description || meta?.hint?.description || "Instituição de ensino"
+    );
+    const wikipediaImageLooksLikeLogo = LOGO_WORDS.test(meta?.wikiPage?.pageImageName || "");
+    const instanceIds = entityIdClaims(entity, "P31");
+    const countryIds = entityIdClaims(entity, "P17");
     return {
       entityId: entity.id,
       name,
       shortName: name,
-      description: localizedValue(entity.descriptions, searchItem?.description || "Instituição de ensino"),
-      website: typeof website === "string" ? website : "",
+      aliases,
+      description,
+      website: typeof website === "string" ? safeRemoteUrl(website) : "",
       logoUrl: logoInfo?.url || "",
       logoTitle: logoInfo?.title || (logoFile ? `File:${logoFile}` : ""),
+      wikidataLogoUrl: logoInfo?.url || "",
+      wikidataLogoTitle: logoInfo?.title || "",
+      wikipediaLogoUrl: wikipediaImageLooksLikeLogo ? meta?.wikiPage?.pageImageUrl || "" : "",
+      wikipediaLogoTitle: wikipediaImageLooksLikeLogo ? meta?.wikiPage?.pageImageName || "" : "",
+      wikipediaUrl: meta?.wikiPage?.pageUrl || "",
+      commonsCategory: String(claimValue(entity, "P373") || "").trim(),
       sourceUrl: `https://www.wikidata.org/wiki/${entity.id}`,
-      claimedColor: normalizeHex(colorClaim, "")
+      claimedColor: normalizeHex(colorClaim, meta?.hint?.claimedColor || ""),
+      instanceIds,
+      countryIds,
+      searchRank: meta?.rank ?? 20,
+      isEducation: EDUCATION_WORDS.test(`${name} ${description}`),
+      brandData: null,
+      brandPalette: [...(meta?.hint?.palette || [])]
     };
   }
 
+  function candidateMatchesQuery(candidate, query) {
+    const target = normalizeSearchText(query);
+    return [candidate.name, ...(candidate.aliases || [])].some((value) => normalizeSearchText(value) === target);
+  }
+
+  function scoreUniversityCandidate(candidate, query) {
+    const normalizedQuery = normalizeSearchText(query);
+    const queryTokens = searchTokens(query);
+    const names = uniqueText([candidate.name, ...(candidate.aliases || [])]);
+    let bestNameScore = 0;
+    names.forEach((name) => {
+      const normalizedName = normalizeSearchText(name);
+      const nameTokens = searchTokens(name);
+      const matchedTokens = queryTokens.filter((token) => nameTokens.some((nameToken) => nameToken === token || nameToken.includes(token) || token.includes(nameToken))).length;
+      const coverage = queryTokens.length ? matchedTokens / queryTokens.length : 0;
+      let score = coverage * 90;
+      if (normalizedName === normalizedQuery) score += 180;
+      else if (normalizedName.startsWith(normalizedQuery) || normalizedQuery.startsWith(normalizedName)) score += 95;
+      else if (normalizedName.includes(normalizedQuery) || normalizedQuery.includes(normalizedName)) score += 70;
+      bestNameScore = Math.max(bestNameScore, score);
+    });
+
+    let score = bestNameScore;
+    if (candidate.isEducation) score += 65;
+    if (candidate.countryIds?.includes("Q155")) score += 22;
+    if (candidate.website) score += 18;
+    if (candidate.logoUrl) score += 10;
+    if (candidate.wikipediaUrl) score += 8;
+    score += Math.max(0, 12 - Number(candidate.searchRank || 0));
+    if (!candidate.isEducation && /\b(person|pessoa|cidade|município|municipio|álbum|album|filme|empresa)\b/i.test(candidate.description || "")) score -= 90;
+    return score;
+  }
+
+  function normalizeWebsiteForLookup(value) {
+    const safe = safeRemoteUrl(value);
+    if (!safe) return "";
+    try {
+      const url = new URL(safe);
+      if (url.protocol === "http:") url.protocol = "https:";
+      url.hash = "";
+      return url.href;
+    } catch {
+      return safe;
+    }
+  }
+
+  function collectHexColors(value, output = []) {
+    if (typeof value === "string") {
+      const matches = value.match(/#[0-9a-f]{6}\b/gi) || [];
+      matches.forEach((color) => {
+        const normalized = normalizeHex(color, "");
+        if (normalized && !output.includes(normalized)) output.push(normalized);
+      });
+      return output;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((item) => collectHexColors(item, output));
+      return output;
+    }
+    if (value && typeof value === "object") Object.values(value).forEach((item) => collectHexColors(item, output));
+    return output;
+  }
+
+  async function fetchWebsiteBrand(website, signal) {
+    const normalizedWebsite = normalizeWebsiteForLookup(website);
+    if (!normalizedWebsite) return null;
+    let cacheKey = normalizedWebsite;
+    try { cacheKey = new URL(normalizedWebsite).hostname.replace(/^www\./, ""); } catch { /* mantém URL */ }
+    if (BRAND_LOOKUP_CACHE.has(cacheKey)) return BRAND_LOOKUP_CACHE.get(cacheKey);
+
+    const endpoint = new URL(MICROLINK_API);
+    endpoint.searchParams.set("url", normalizedWebsite);
+    endpoint.searchParams.set("palette", "true");
+    endpoint.searchParams.set("meta", "true");
+    const payload = await jsonRequest(endpoint, signal, 18000);
+    if (payload?.status && payload.status !== "success") throw new Error(payload.message || "Não foi possível consultar o site oficial.");
+    const data = payload?.data || {};
+    const logo = data.logo || {};
+    const image = data.image || {};
+    const logoUrl = safeRemoteUrl(logo.url);
+    const imageUrl = safeRemoteUrl(image.url);
+    const imageLooksLikeLogo = LOGO_WORDS.test(imageUrl) || (
+      Number(image.width) > 0 && Number(image.height) > 0 && Number(image.width) / Number(image.height) >= .35 && Number(image.width) / Number(image.height) <= 3.2
+    );
+    const palette = collectHexColors(logo.palette || data.palette || (imageLooksLikeLogo ? image.palette : null)).slice(0, 8);
+    const brand = {
+      website: normalizeWebsiteForLookup(data.url || normalizedWebsite),
+      logoUrl: logoUrl || (imageLooksLikeLogo && LOGO_WORDS.test(imageUrl) ? imageUrl : ""),
+      logoTitle: "Logo localizado no site oficial",
+      palette,
+      title: String(data.title || data.publisher || "").trim(),
+      description: String(data.description || "").trim(),
+      source: "Site oficial"
+    };
+    BRAND_LOOKUP_CACHE.set(cacheKey, brand);
+    return brand;
+  }
+
+  function websiteFallbackLogos(website) {
+    const normalizedWebsite = normalizeWebsiteForLookup(website);
+    if (!normalizedWebsite) return [];
+    try {
+      const url = new URL(normalizedWebsite);
+      const hostname = url.hostname.replace(/^www\./, "");
+      return [
+        {
+          title: "Símbolo do site oficial",
+          url: `https://www.google.com/s2/favicons?domain_url=${encodeURIComponent(url.origin)}&sz=256`,
+          source: "Site oficial",
+          palette: []
+        },
+        {
+          title: "Ícone alternativo do site oficial",
+          url: `https://icons.duckduckgo.com/ip3/${encodeURIComponent(hostname)}.ico`,
+          source: "Site oficial",
+          palette: []
+        }
+      ];
+    } catch {
+      return [];
+    }
+  }
+
+  async function enrichCandidatesWithOfficialBrand(candidates, signal) {
+    const targets = candidates.filter((candidate) => candidate.website).slice(0, 2);
+    await Promise.allSettled(targets.map(async (candidate) => {
+      try {
+        const brand = await fetchWebsiteBrand(candidate.website, signal);
+        if (!brand) return;
+        candidate.brandData = brand;
+        candidate.brandPalette = uniqueText([...(candidate.brandPalette || []), ...(brand.palette || [])]);
+        candidate.website = brand.website || candidate.website;
+        if (brand.logoUrl) {
+          candidate.logoUrl = brand.logoUrl;
+          candidate.logoTitle = brand.logoTitle;
+        }
+        if (!candidate.claimedColor && brand.palette?.[0]) candidate.claimedColor = brand.palette[0];
+        if ((!candidate.description || candidate.description === "Instituição de ensino") && brand.description) candidate.description = brand.description;
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        console.warn(`Identidade do site oficial (${candidate.name}):`, error.message);
+      }
+    }));
+    if (signal?.aborted) throw new DOMException("Busca cancelada", "AbortError");
+    return candidates;
+  }
+
   async function searchUniversityEntities(query, signal) {
+    const variants = buildSearchVariants(query);
+    const hint = institutionHint(query);
     const searchById = new Map();
-    for (const language of ["pt-br", "pt", "en"]) {
+    const plans = [
+      ...["pt-br", "pt", "en"].map((language) => ({ query: variants[0], language, rank: 0 })),
+      ...variants.slice(1, 5).map((variant, index) => ({ query: variant, language: "pt", rank: index + 1 }))
+    ];
+
+    const searchResponses = await Promise.allSettled(plans.map(async (plan) => {
       const searchData = await mediaWikiRequest(WIKIDATA_API, {
         action: "wbsearchentities",
-        search: query,
-        language,
+        search: plan.query,
+        language: plan.language,
         uselang: "pt-br",
         type: "item",
-        limit: 10
+        limit: 12
       }, signal);
-      (searchData.search || []).forEach((item) => {
-        if (!searchById.has(item.id)) searchById.set(item.id, item);
+      return { plan, items: searchData.search || [] };
+    }));
+
+    searchResponses.forEach((response) => {
+      if (response.status !== "fulfilled") return;
+      const { plan, items } = response.value;
+      items.forEach((item, position) => {
+        const current = searchById.get(item.id);
+        const rank = plan.rank * 10 + position;
+        if (!current || rank < current.rank) searchById.set(item.id, { searchItem: item, rank, hint: null, wikiPage: null });
       });
-      if (searchById.size >= 8) break;
+    });
+
+    const wikipediaPages = await searchWikipediaPages(variants, signal);
+    wikipediaPages.forEach((wikiPage, entityId) => {
+      const current = searchById.get(entityId) || { searchItem: null, rank: 18, hint: null, wikiPage: null };
+      current.wikiPage = wikiPage;
+      current.rank = Math.min(current.rank, 6 + wikiPage.rank);
+      searchById.set(entityId, current);
+    });
+
+    if (hint) {
+      const exactEntry = [...searchById.entries()].find(([, meta]) => {
+        const names = [meta.searchItem?.label, meta.wikiPage?.pageTitle].filter(Boolean);
+        return names.some((name) => {
+          const normalizedName = normalizeSearchText(name);
+          return hint.keys.some((key) => {
+            const normalizedKey = normalizeSearchText(key);
+            return normalizedName === normalizedKey || normalizedName.includes(normalizedKey) || normalizedKey.includes(normalizedName);
+          }) || normalizedName === normalizeSearchText(hint.canonicalName);
+        });
+      });
+      if (exactEntry) exactEntry[1].hint = hint;
     }
 
-    const searchItems = [...searchById.values()].slice(0, 10);
-    if (!searchItems.length) return [];
-    const ids = searchItems.map((item) => item.id).join("|");
+    const selectedEntries = [...searchById.entries()].sort((a, b) => a[1].rank - b[1].rank).slice(0, 24);
+    if (!selectedEntries.length) {
+      if (!hint) return [];
+      return [{
+        entityId: `hint-${Date.now()}`,
+        name: hint.canonicalName,
+        shortName: hint.canonicalName,
+        aliases: hint.aliases || [],
+        description: hint.description,
+        website: hint.website,
+        logoUrl: "",
+        logoTitle: "",
+        wikidataLogoUrl: "",
+        wikidataLogoTitle: "",
+        wikipediaLogoUrl: "",
+        wikipediaLogoTitle: "",
+        commonsCategory: "",
+        sourceUrl: "",
+        claimedColor: hint.claimedColor,
+        instanceIds: [],
+        countryIds: ["Q155"],
+        searchRank: 0,
+        isEducation: true,
+        brandData: null,
+        brandPalette: [...(hint.palette || [])]
+      }];
+    }
+
+    const ids = selectedEntries.map(([id]) => id).join("|");
     const entityData = await mediaWikiRequest(WIKIDATA_API, {
       action: "wbgetentities",
       ids,
-      props: "labels|descriptions|claims",
+      props: "labels|descriptions|aliases|claims|sitelinks",
       languages: "pt-br|pt|en"
     }, signal);
     const entities = entityData.entities || {};
-    const logos = searchItems.map((item) => claimValue(entities[item.id], "P154")).filter(Boolean);
+    const logos = selectedEntries.map(([id]) => claimValue(entities[id], "P154")).filter(Boolean);
     const logoMap = await resolveCommonsFiles(logos, signal);
-    return searchItems
-      .map((item) => parseSearchEntity(entities[item.id] || {}, item, logoMap))
-      .filter((item) => item.name);
+
+    let candidates = selectedEntries
+      .map(([id, meta]) => parseSearchEntity(entities[id] || { id }, meta, logoMap))
+      .filter((candidate) => candidate.name)
+      .map((candidate) => ({ ...candidate, relevance: scoreUniversityCandidate(candidate, query) }))
+      .filter((candidate) => candidate.relevance >= 45 || candidate.isEducation)
+      .sort((a, b) => b.relevance - a.relevance)
+      .slice(0, 12);
+
+    if (hint && !candidates.some((candidate) => candidateMatchesQuery(candidate, hint.canonicalName))) {
+      candidates.unshift({
+        entityId: `hint-${Date.now()}`,
+        name: hint.canonicalName,
+        shortName: hint.canonicalName,
+        aliases: hint.aliases || [],
+        description: hint.description,
+        website: hint.website,
+        logoUrl: "",
+        logoTitle: "",
+        wikidataLogoUrl: "",
+        wikidataLogoTitle: "",
+        wikipediaLogoUrl: "",
+        wikipediaLogoTitle: "",
+        commonsCategory: "",
+        sourceUrl: "",
+        claimedColor: hint.claimedColor,
+        instanceIds: [],
+        countryIds: ["Q155"],
+        searchRank: 0,
+        isEducation: true,
+        brandData: null,
+        brandPalette: [...(hint.palette || [])],
+        relevance: 400
+      });
+    }
+
+    candidates = await enrichCandidatesWithOfficialBrand(candidates, signal);
+    return candidates.sort((a, b) => scoreUniversityCandidate(b, query) - scoreUniversityCandidate(a, query)).slice(0, 12);
   }
 
   function imageFromBlob(blob) {
@@ -640,10 +1140,21 @@
   }
 
   async function createUniversityTheme(candidate, logoChoice) {
-    const selectedLogo = logoChoice || (candidate.logoUrl ? { url: candidate.logoUrl, title: candidate.logoTitle } : null);
+    const selectedLogo = logoChoice || (candidate.logoUrl ? { url: candidate.logoUrl, title: candidate.logoTitle, palette: candidate.brandPalette || [] } : null);
+    const paletteHint = uniqueText([
+      ...(selectedLogo?.palette || []),
+      ...(candidate.brandPalette || [])
+    ]).map((color) => normalizeHex(color, "")).filter(Boolean);
     const extracted = selectedLogo?.url ? await extractLogoColors(selectedLogo.url) : [];
-    const primary = candidate.claimedColor || extracted[0] || deterministicColor(candidate.name);
-    const accent = extracted.find((color) => Math.abs(relativeLuminance(color) - relativeLuminance(primary)) > .07) || extracted[1] || "";
+    const colorOptions = uniqueText([...paletteHint, ...extracted]).map((color) => normalizeHex(color, "")).filter(Boolean);
+    const saturatedColors = colorOptions.filter((color) => {
+      const rgb = hexToRgb(color);
+      if (!rgb) return false;
+      const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+      return hsl.s >= .22 && hsl.l >= .12 && hsl.l <= .82;
+    });
+    const primary = candidate.claimedColor || saturatedColors[0] || colorOptions[0] || deterministicColor(candidate.name);
+    const accent = [...saturatedColors, ...colorOptions].find((color) => color !== primary && Math.abs(relativeLuminance(color) - relativeLuminance(primary)) > .07) || colorOptions[1] || "";
     return normalizeUniversity({
       ...candidate,
       logoUrl: selectedLogo?.url || "",
@@ -699,6 +1210,10 @@
         const image = document.createElement("img");
         image.src = item.logoUrl;
         image.alt = "";
+        image.onerror = () => {
+          media.replaceChildren();
+          media.textContent = initials(item.name).slice(0, 2);
+        };
         media.appendChild(image);
       } else {
         media.textContent = initials(item.name).slice(0, 2);
@@ -736,8 +1251,7 @@
     els.universityModalSearchButton.disabled = true;
     try {
       universitySearchResults = await searchUniversityEntities(query, universitySearchController.signal);
-      const normalizedQuery = query.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ").trim();
-      const hasExactResult = universitySearchResults.some((item) => item.name.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ").trim() === normalizedQuery);
+      const hasExactResult = universitySearchResults.some((item) => candidateMatchesQuery(item, query));
       if (!hasExactResult) {
         universitySearchResults.push({
           entityId: `custom-${Date.now()}`,
@@ -753,8 +1267,8 @@
         });
       }
       els.universitySearchStatus.textContent = universitySearchResults.length > 1
-        ? `${universitySearchResults.length} opção(ões). Selecione a instituição correta para conferir o logo.`
-        : "A busca livre está disponível. Confira os logos encontrados antes de aplicar.";
+        ? `${universitySearchResults.length} opção(ões), ordenadas pela correspondência do nome e pelo site oficial.`
+        : "A instituição foi localizada. Confira a identidade visual antes de aplicar.";
       renderUniversityResults(universitySearchResults);
     } catch (error) {
       if (error.name === "AbortError") return;
@@ -850,21 +1364,82 @@
     [...els.universitySearchResults.querySelectorAll(".university-result")].forEach((item) => {
       item.classList.toggle("active", Number(item.dataset.index) === index);
     });
-    els.universitySearchStatus.innerHTML = '<span class="search-spinner" aria-hidden="true"></span> Preparando a prévia da identidade visual…';
+    els.universitySearchStatus.innerHTML = '<span class="search-spinner" aria-hidden="true"></span> Consultando o site oficial e preparando a identidade visual…';
     els.universityModalApplyButton.disabled = true;
     try {
-      let logoChoices = candidate.logoUrl ? [{ title: candidate.logoTitle, url: candidate.logoUrl }] : [];
-      const extraChoices = await searchCommonsLogos(candidate.name, universitySearchController?.signal);
-      extraChoices.forEach((choice) => {
-        if (!logoChoices.some((item) => item.url === choice.url)) logoChoices.push(choice);
+      const base = { ...candidate };
+      let brandData = candidate.brandData || null;
+      if (!brandData && candidate.website) {
+        try { brandData = await fetchWebsiteBrand(candidate.website, universitySearchController?.signal); }
+        catch (error) {
+          if (error.name === "AbortError") throw error;
+          console.warn("Site oficial:", error.message);
+        }
+      }
+      if (brandData) {
+        base.brandData = brandData;
+        base.brandPalette = uniqueText([...(base.brandPalette || []), ...(brandData.palette || [])]);
+        base.website = brandData.website || base.website;
+        if ((!base.description || base.description === "Instituição de ensino") && brandData.description) base.description = brandData.description;
+      }
+
+      const logoChoices = [];
+      const addLogoChoice = (choice) => {
+        const url = safeRemoteUrl(choice?.url);
+        if (!url || logoChoices.some((item) => item.url === url)) return;
+        logoChoices.push({
+          title: choice.title || "Opção de logo",
+          url,
+          source: choice.source || "Fonte pública",
+          palette: (choice.palette || []).map((color) => normalizeHex(color, "")).filter(Boolean)
+        });
+      };
+
+      if (brandData?.logoUrl) addLogoChoice({
+        title: brandData.logoTitle || "Logo do site oficial",
+        url: brandData.logoUrl,
+        source: "Site oficial",
+        palette: brandData.palette || []
       });
-      logoChoices = logoChoices.slice(0, 5);
-      const selectedLogo = logoChoices[0] || null;
-      const theme = await createUniversityTheme(candidate, selectedLogo);
-      universityPreviewCandidate = { base: candidate, logoChoices, selectedLogo, theme };
-      els.universitySearchStatus.textContent = logoChoices.length
-        ? "Confira o logo, as cores e a instituição antes de aplicar."
-        : "A instituição foi encontrada, mas não houve logo disponível. Será usado um símbolo com as iniciais.";
+      if (candidate.wikidataLogoUrl) addLogoChoice({
+        title: candidate.wikidataLogoTitle || "Logo institucional",
+        url: candidate.wikidataLogoUrl,
+        source: "Wikidata",
+        palette: []
+      });
+      if (candidate.wikipediaLogoUrl) addLogoChoice({
+        title: candidate.wikipediaLogoTitle || "Logo da página institucional",
+        url: candidate.wikipediaLogoUrl,
+        source: "Wikipedia",
+        palette: []
+      });
+      if (candidate.logoUrl) addLogoChoice({
+        title: candidate.logoTitle || "Logo institucional",
+        url: candidate.logoUrl,
+        source: candidate.brandData?.logoUrl === candidate.logoUrl ? "Site oficial" : "Fonte pública",
+        palette: candidate.brandPalette || []
+      });
+
+      const extraChoices = await searchCommonsLogos(
+        candidate.name,
+        candidate.aliases || [],
+        candidate.commonsCategory || "",
+        universitySearchController?.signal
+      );
+      extraChoices.forEach(addLogoChoice);
+      websiteFallbackLogos(base.website).forEach(addLogoChoice);
+
+      const limitedChoices = logoChoices.slice(0, 7);
+      const selectedLogo = limitedChoices[0] || null;
+      const theme = await createUniversityTheme(base, selectedLogo);
+      universityPreviewCandidate = { base, logoChoices: limitedChoices, selectedLogo, theme };
+      if (brandData?.logoUrl) {
+        els.universitySearchStatus.textContent = "Identidade localizada no site oficial. Confira o logo e as cores antes de aplicar.";
+      } else if (limitedChoices.length) {
+        els.universitySearchStatus.textContent = "Confira as opções de logo e a prévia antes de aplicar.";
+      } else {
+        els.universitySearchStatus.textContent = "Não foi encontrado um logo público confiável. Será usado um símbolo com as iniciais.";
+      }
       renderUniversityPreview();
     } catch (error) {
       if (error.name === "AbortError") return;
