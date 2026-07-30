@@ -8,7 +8,7 @@
   <title>Portal Acadêmico</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/styles.css?v=6.0">
+  <link rel="stylesheet" href="css/styles.css?v=7.0">
 </head>
 <body>
   <div class="app-shell" id="appShell" hidden>
@@ -19,7 +19,7 @@
 
       <div class="brand-lockup" aria-label="Portal Acadêmico">
         <div class="brand-logo-box" aria-hidden="true">
-          <img class="brand-logo-image" id="headerUniversityLogo" src="assets/brands/cruzeiro.svg" alt="">
+          <img class="brand-logo-image" id="headerUniversityLogo" src="assets/favicon.svg" alt="">
         </div>
         <div>
           <strong>Portal Acadêmico</strong>
@@ -54,7 +54,7 @@
         <article class="course-card">
           <div class="course-icon" aria-hidden="true">Ψ</div>
           <div class="course-card__body">
-            <span class="course-label" id="courseUniversityLabel">Cruzeiro do Sul Virtual</span>
+            <span class="course-label" id="courseUniversityLabel">Universidade não definida</span>
             <h3 id="courseNameLabel">Neuropsicologia</h3>
             <p id="courseStudentLabel">Dados acadêmicos vinculados ao perfil do estudante.</p>
             <div class="course-meta">
@@ -126,7 +126,7 @@
             <div class="student-card__pattern" aria-hidden="true"></div>
 
             <div class="university-lockup">
-              <img id="cardUniversityLogo" src="assets/brands/cruzeiro.svg" alt="Cruzeiro do Sul Virtual">
+              <img id="cardUniversityLogo" src="assets/favicon.svg" alt="Portal Acadêmico">
             </div>
 
             <div class="card-photo-frame" id="cardPhotoFrame">
@@ -152,7 +152,7 @@
 
             <div class="student-card__rule" aria-hidden="true"></div>
             <div class="student-card__institution">
-              <strong id="cardInstitutionLabel">CRUZEIRO DO SUL · PÓS-EAD</strong>
+              <strong id="cardInstitutionLabel">IDENTIFICAÇÃO ACADÊMICA</strong>
               <span id="cardDocumentNumber">Documento acadêmico digital</span>
             </div>
           </article>
@@ -170,7 +170,7 @@
         <div class="faq-list">
           <details open>
             <summary>Como alterar os dados da carteirinha?</summary>
-            <p>Abra “Perfil”, escolha a universidade, preencha Nome do Aluno, Curso, Matrícula e Validade e toque em “Salvar informações”.</p>
+            <p>Abra “Perfil”, busque sua universidade, confira a identidade visual, preencha Nome do Aluno, Curso, Matrícula e Validade e toque em “Salvar informações”.</p>
           </details>
           <details>
             <summary>Como colocar a foto no quadrado da carteirinha?</summary>
@@ -206,17 +206,29 @@
             <span class="sync-badge" id="syncBadge">Sincronizado</span>
           </div>
 
-          <label>
-            <span>Universidade</span>
-            <select id="universitySelect" name="university" required>
-              <option value="cruzeiro">Cruzeiro do Sul Virtual</option>
-              <option value="unibf">UniBF</option>
-              <option value="uninter">UNINTER</option>
-              <option value="sumare">Sumaré EAD</option>
-              <option value="unicesumar">UniCesumar</option>
-            </select>
-            <small class="field-help">Ao escolher, a identidade visual do portal muda imediatamente.</small>
-          </label>
+          <div class="university-search-field">
+            <label for="universitySearchInput">Universidade</label>
+            <div class="university-search-bar">
+              <input id="universitySearchInput" type="search" maxlength="100" autocomplete="off" placeholder="Digite o nome da universidade">
+              <button class="field-action-button university-search-button" id="universitySearchButton" type="button" aria-label="Buscar universidade na internet">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+                <span>Buscar</span>
+              </button>
+            </div>
+            <small class="field-help">A busca localiza instituições, logos e cores em fontes públicas. Você confere uma prévia antes de aplicar.</small>
+          </div>
+
+          <section class="selected-university is-empty" id="selectedUniversityPanel" aria-live="polite">
+            <div class="selected-university__logo">
+              <img id="selectedUniversityLogo" alt="" hidden>
+              <span id="selectedUniversityInitial">UN</span>
+            </div>
+            <div class="selected-university__copy">
+              <strong id="selectedUniversityName">Nenhuma universidade escolhida</strong>
+              <p id="selectedUniversityDescription">Use a busca online para localizar sua instituição e conferir o logo antes de aplicar.</p>
+            </div>
+            <button class="secondary-button compact" id="changeUniversityButton" type="button">Buscar</button>
+          </section>
 
           <label>
             <span>Nome do Aluno</span>
@@ -304,7 +316,7 @@
 
   <div class="auth-screen" id="authScreen">
     <div class="auth-card">
-      <div class="auth-brand-logo"><img id="authUniversityLogo" src="assets/brands/cruzeiro.svg" alt=""></div>
+      <div class="auth-brand-logo"><img id="authUniversityLogo" src="assets/favicon.svg" alt=""></div>
       <p class="eyebrow">PORTAL PARTICULAR</p>
       <h1>Carteirinha acadêmica sempre à mão.</h1>
       <p>Entre com sua conta Google para acessar sua carteirinha.</p>
@@ -314,6 +326,76 @@
       </button>
       <small class="auth-hint" id="authHint">Carregando a configuração de acesso…</small>
     </div>
+  </div>
+
+
+  <div class="university-modal" id="universityModal" hidden role="dialog" aria-modal="true" aria-labelledby="universityModalTitle">
+    <button class="university-modal__backdrop" id="universityModalBackdrop" type="button" aria-label="Fechar busca de universidade"></button>
+    <section class="university-dialog">
+      <header class="university-dialog__header">
+        <div>
+          <p class="eyebrow">BUSCA ONLINE</p>
+          <h2 id="universityModalTitle">Encontrar universidade</h2>
+        </div>
+        <button class="crop-close-button" id="universityModalCloseButton" type="button" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <p class="university-dialog__instructions">Digite o nome da instituição e escolha o resultado correto. O portal mostra o logo e as cores antes de fazer qualquer alteração.</p>
+
+      <div class="university-modal-search">
+        <input id="universityModalQuery" type="search" maxlength="100" autocomplete="off" placeholder="Ex.: Universidade de São Paulo">
+        <button class="primary-button" id="universityModalSearchButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          Pesquisar
+        </button>
+      </div>
+
+      <p class="university-search-status" id="universitySearchStatus">Informe o nome da universidade para iniciar.</p>
+      <div class="university-results" id="universitySearchResults"></div>
+
+      <section class="university-preview" id="universityPreview" hidden>
+        <div class="university-preview__heading">
+          <div class="university-preview__logo">
+            <img id="universityPreviewLogo" alt="" hidden>
+            <span id="universityPreviewInitial">UN</span>
+          </div>
+          <div>
+            <small>IDENTIDADE ENCONTRADA</small>
+            <h3 id="universityPreviewName">Universidade</h3>
+            <p id="universityPreviewDescription">Instituição de ensino</p>
+            <a id="universityPreviewWebsite" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+          </div>
+        </div>
+
+        <div class="logo-choices-wrap" id="universityLogoChoices" hidden aria-label="Outras opções de logo"></div>
+
+        <div class="university-theme-summary">
+          <div>
+            <span>Cores identificadas</span>
+            <div class="university-color-swatches" id="universityColorSwatches"></div>
+          </div>
+          <div class="university-mini-preview" id="universityMiniPreview" aria-label="Prévia do tema">
+            <div class="mini-preview__top">
+              <div><img alt="" hidden><span>UN</span></div>
+              <i></i>
+            </div>
+            <strong>Portal Acadêmico</strong>
+            <small>Prévia da identidade visual</small>
+            <b></b>
+          </div>
+        </div>
+      </section>
+
+      <div class="university-modal-actions">
+        <button class="secondary-button" id="universityModalCancelButton" type="button">Cancelar</button>
+        <button class="primary-button" id="universityModalApplyButton" type="button" disabled>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg>
+          Aplicar esta identidade
+        </button>
+      </div>
+    </section>
   </div>
 
   <div class="crop-modal" id="cropModal" hidden role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
@@ -355,7 +437,7 @@
   <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="https://ricardobmuller.github.io/Portal-FCC/config.js"></script>
-  <script src="js/config.js?v=6.0"></script>
-  <script src="js/app.js?v=6.0"></script>
+  <script src="js/config.js?v=7.0"></script>
+  <script src="js/app.js?v=7.0"></script>
 </body>
 </html>

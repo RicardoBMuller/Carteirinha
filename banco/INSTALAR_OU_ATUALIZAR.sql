@@ -2,7 +2,7 @@
 -- PORTAL ACADÊMICO - INSTALAÇÃO OU ATUALIZAÇÃO
 -- ============================================================
 -- Script não destrutivo. Pode ser executado novamente.
--- Mantém os registros existentes e prepara os dados do portal.
+-- Mantém os registros existentes e adiciona o tema pesquisado.
 
 create table if not exists public.fcc_student_cards (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -10,11 +10,21 @@ create table if not exists public.fcc_student_cards (
   course_name text not null default 'Neuropsicologia',
   registration_number text not null default '00000000-0',
   valid_until text not null default '12/2029',
-  university text not null default 'cruzeiro',
+  university text not null default '',
+  university_theme jsonb not null default '{}'::jsonb,
   photo_path text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.fcc_student_cards
+  add column if not exists university text not null default '';
+
+alter table public.fcc_student_cards
+  add column if not exists university_theme jsonb not null default '{}'::jsonb;
+
+alter table public.fcc_student_cards
+  alter column university set default '';
 
 alter table public.fcc_student_cards enable row level security;
 
@@ -111,14 +121,15 @@ select
   exists (
     select 1 from storage.buckets where id = 'fcc-student-card-photos'
   ) as bucket_criado,
+  exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'fcc_student_cards'
+      and column_name = 'university_theme'
+  ) as tema_dinamico_criado,
   (
     select relrowsecurity
     from pg_class
     where oid = 'public.fcc_student_cards'::regclass
   ) as rls_ativo;
-
-
--- Compatibilidade com a versão multiuniversidades.
--- Mantém registros existentes e muda apenas o valor padrão para novos perfis.
-alter table public.fcc_student_cards
-  alter column university set default 'cruzeiro';

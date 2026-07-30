@@ -3,52 +3,46 @@
 
   const TABLE_NAME = "fcc_student_cards";
   const STORAGE_BUCKET = "fcc-student-card-photos";
-  const DEFAULT_UNIVERSITY = "cruzeiro";
   const CROP_OUTPUT_SIZE = 900;
-  const UNIVERSITIES = Object.freeze({
-    cruzeiro: Object.freeze({
-      name: "Cruzeiro do Sul Virtual",
-      shortName: "Cruzeiro do Sul",
-      logo: "assets/brands/cruzeiro.svg",
-      themeColor: "#eef8ff",
-      footer: "CRUZEIRO DO SUL · PÓS-EAD"
-    }),
-    unibf: Object.freeze({
-      name: "UniBF",
-      shortName: "UniBF",
-      logo: "assets/brands/unibf.svg",
-      themeColor: "#eef6f5",
-      footer: "UNIBF · CENTRO UNIVERSITÁRIO"
-    }),
-    uninter: Object.freeze({
-      name: "UNINTER",
-      shortName: "UNINTER",
-      logo: "assets/brands/uninter.svg",
-      themeColor: "#f5f7fb",
-      footer: "CENTRO UNIVERSITÁRIO INTERNACIONAL UNINTER"
-    }),
-    sumare: Object.freeze({
-      name: "Sumaré EAD",
-      shortName: "Sumaré",
-      logo: "assets/brands/sumare.svg",
-      themeColor: "#f1f5f7",
-      footer: "CENTRO UNIVERSITÁRIO SUMARÉ · EAD"
-    }),
-    unicesumar: Object.freeze({
-      name: "UniCesumar",
-      shortName: "UniCesumar",
-      logo: "assets/brands/unicesumar.svg",
-      themeColor: "#f1f8fb",
-      footer: "UNICESUMAR · EDUCAÇÃO A DISTÂNCIA"
-    })
+  const WIKIDATA_API = "https://www.wikidata.org/w/api.php";
+  const COMMONS_API = "https://commons.wikimedia.org/w/api.php";
+  const GENERIC_LOGO = "assets/favicon.svg";
+
+  const DEFAULT_COLORS = Object.freeze({
+    primary: "#155a91",
+    secondary: "#1c78b0",
+    accent: "#67c5d5",
+    background: "#eef8ff",
+    backgroundEnd: "#e9f5fd",
+    backgroundSoft: "#f8fcff",
+    cardStart: "#e6f6ff",
+    cardEnd: "#cceaff",
+    cardInk: "#17334b",
+    cardMuted: "#5d7890"
   });
+
+  function blankUniversity(overrides = {}) {
+    return {
+      entityId: "",
+      name: "",
+      shortName: "",
+      description: "",
+      website: "",
+      logoUrl: "",
+      logoTitle: "",
+      sourceUrl: "",
+      colors: { ...DEFAULT_COLORS },
+      ...overrides,
+      colors: { ...DEFAULT_COLORS, ...(overrides.colors || {}) }
+    };
+  }
 
   const DEFAULT_CARD = Object.freeze({
     studentName: "Aluno(a) Exemplo",
     course: "Neuropsicologia",
     registration: "00000000-0",
     validUntil: "12/2029",
-    university: DEFAULT_UNIVERSITY,
+    university: blankUniversity(),
     photoPath: "",
     photoUrl: "",
     localPhoto: ""
@@ -90,7 +84,14 @@
     studentPhoto: document.getElementById("studentPhoto"),
     studentInitial: document.getElementById("studentInitial"),
     profileForm: document.getElementById("profileForm"),
-    universitySelect: document.getElementById("universitySelect"),
+    universitySearchInput: document.getElementById("universitySearchInput"),
+    universitySearchButton: document.getElementById("universitySearchButton"),
+    changeUniversityButton: document.getElementById("changeUniversityButton"),
+    selectedUniversityPanel: document.getElementById("selectedUniversityPanel"),
+    selectedUniversityLogo: document.getElementById("selectedUniversityLogo"),
+    selectedUniversityInitial: document.getElementById("selectedUniversityInitial"),
+    selectedUniversityName: document.getElementById("selectedUniversityName"),
+    selectedUniversityDescription: document.getElementById("selectedUniversityDescription"),
     studentNameInput: document.getElementById("studentNameInput"),
     courseInput: document.getElementById("courseInput"),
     registrationInput: document.getElementById("registrationInput"),
@@ -115,6 +116,24 @@
     cropStage: document.getElementById("cropStage"),
     cropImage: document.getElementById("cropImage"),
     cropZoom: document.getElementById("cropZoom"),
+    universityModal: document.getElementById("universityModal"),
+    universityModalBackdrop: document.getElementById("universityModalBackdrop"),
+    universityModalCloseButton: document.getElementById("universityModalCloseButton"),
+    universityModalCancelButton: document.getElementById("universityModalCancelButton"),
+    universityModalApplyButton: document.getElementById("universityModalApplyButton"),
+    universityModalQuery: document.getElementById("universityModalQuery"),
+    universityModalSearchButton: document.getElementById("universityModalSearchButton"),
+    universitySearchStatus: document.getElementById("universitySearchStatus"),
+    universitySearchResults: document.getElementById("universitySearchResults"),
+    universityPreview: document.getElementById("universityPreview"),
+    universityPreviewLogo: document.getElementById("universityPreviewLogo"),
+    universityPreviewInitial: document.getElementById("universityPreviewInitial"),
+    universityPreviewName: document.getElementById("universityPreviewName"),
+    universityPreviewDescription: document.getElementById("universityPreviewDescription"),
+    universityPreviewWebsite: document.getElementById("universityPreviewWebsite"),
+    universityLogoChoices: document.getElementById("universityLogoChoices"),
+    universityColorSwatches: document.getElementById("universityColorSwatches"),
+    universityMiniPreview: document.getElementById("universityMiniPreview"),
     toast: document.getElementById("toast")
   };
 
@@ -123,6 +142,9 @@
   let currentView = "courses";
   let cardData = { ...DEFAULT_CARD };
   let toastTimer = null;
+  let universitySearchResults = [];
+  let universityPreviewCandidate = null;
+  let universitySearchController = null;
   let cropState = {
     source: "",
     naturalWidth: 0,
@@ -179,33 +201,686 @@
     return Math.min(Math.max(value, min), max);
   }
 
+  function normalizeHex(value, fallback = "") {
+    const raw = String(value || "").trim().replace(/^#/, "");
+    if (/^[0-9a-f]{3}$/i.test(raw)) {
+      return `#${raw.split("").map((char) => `${char}${char}`).join("")}`.toLowerCase();
+    }
+    if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw.toLowerCase()}`;
+    return fallback;
+  }
+
+  function safeRemoteUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    try {
+      const url = new URL(raw, window.location.href);
+      return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+    } catch {
+      return "";
+    }
+  }
+
   function normalizeUniversity(value) {
-    const candidate = String(value || "").trim();
-    if (UNIVERSITIES[candidate]) return candidate;
-    const byName = Object.entries(UNIVERSITIES).find(([, item]) => item.name.toLowerCase() === candidate.toLowerCase());
-    return byName?.[0] || DEFAULT_UNIVERSITY;
+    if (!value) return blankUniversity();
+    if (typeof value === "string") {
+      const raw = value.trim();
+      if (/^[a-z0-9_-]{2,24}$/.test(raw) && raw === raw.toLowerCase()) return blankUniversity();
+      return blankUniversity({ name: raw, shortName: raw });
+    }
+    if (typeof value !== "object") return blankUniversity();
+
+    const rawName = String(value.name || value.universityName || "").trim();
+    const legacyName = rawName;
+    const colors = value.colors && typeof value.colors === "object" ? value.colors : {};
+    return blankUniversity({
+      entityId: String(value.entityId || value.wikidataId || "").trim(),
+      name: legacyName,
+      shortName: String(value.shortName || legacyName).trim(),
+      description: String(value.description || "").trim(),
+      website: safeRemoteUrl(value.website),
+      logoUrl: safeRemoteUrl(value.logoUrl || value.logo),
+      logoTitle: String(value.logoTitle || "").trim(),
+      sourceUrl: safeRemoteUrl(value.sourceUrl),
+      colors: {
+        primary: normalizeHex(colors.primary, DEFAULT_COLORS.primary),
+        secondary: normalizeHex(colors.secondary, DEFAULT_COLORS.secondary),
+        accent: normalizeHex(colors.accent, DEFAULT_COLORS.accent),
+        background: normalizeHex(colors.background, DEFAULT_COLORS.background),
+        backgroundEnd: normalizeHex(colors.backgroundEnd, DEFAULT_COLORS.backgroundEnd),
+        backgroundSoft: normalizeHex(colors.backgroundSoft, DEFAULT_COLORS.backgroundSoft),
+        cardStart: normalizeHex(colors.cardStart, DEFAULT_COLORS.cardStart),
+        cardEnd: normalizeHex(colors.cardEnd, DEFAULT_COLORS.cardEnd),
+        cardInk: normalizeHex(colors.cardInk, DEFAULT_COLORS.cardInk),
+        cardMuted: normalizeHex(colors.cardMuted, DEFAULT_COLORS.cardMuted)
+      }
+    });
   }
 
   function currentUniversity() {
-    return UNIVERSITIES[normalizeUniversity(cardData.university)];
+    return normalizeUniversity(cardData.university);
   }
 
-  function applyUniversityTheme(universityKey, remember = true) {
-    const key = normalizeUniversity(universityKey);
-    const university = UNIVERSITIES[key];
-    cardData.university = key;
-    document.documentElement.dataset.university = key;
-    if (els.themeColorMeta) els.themeColorMeta.content = university.themeColor;
-    if (els.headerUniversityLogo) els.headerUniversityLogo.src = university.logo;
-    if (els.authUniversityLogo) els.authUniversityLogo.src = university.logo;
-    if (els.cardUniversityLogo) {
-      els.cardUniversityLogo.src = university.logo;
-      els.cardUniversityLogo.alt = university.name;
+  function setUniversityLogo(imgElement, fallbackElement, university) {
+    if (!imgElement) return;
+    const hasLogo = Boolean(university.logoUrl);
+    imgElement.onerror = null;
+    imgElement.src = hasLogo ? university.logoUrl : GENERIC_LOGO;
+    imgElement.alt = hasLogo ? university.name : "Portal Acadêmico";
+    imgElement.classList.toggle("is-generic-logo", !hasLogo);
+    if (fallbackElement) {
+      fallbackElement.textContent = initials(university.name || "Universidade").slice(0, 2);
+      fallbackElement.hidden = hasLogo;
+      imgElement.hidden = !hasLogo;
     }
-    if (els.courseUniversityLabel) els.courseUniversityLabel.textContent = university.name;
-    if (els.cardInstitutionLabel) els.cardInstitutionLabel.textContent = university.footer;
-    document.title = `Portal Acadêmico · ${university.shortName}`;
-    if (remember) localStorage.setItem("portal-carteirinhas:last-university", key);
+    if (hasLogo) {
+      imgElement.onerror = () => {
+        imgElement.onerror = null;
+        if (fallbackElement) {
+          imgElement.hidden = true;
+          fallbackElement.hidden = false;
+        } else {
+          imgElement.src = GENERIC_LOGO;
+          imgElement.alt = "Portal Acadêmico";
+          imgElement.classList.add("is-generic-logo");
+        }
+      };
+    }
+  }
+
+  function applyCssVariables(colors) {
+    const root = document.documentElement;
+    const primaryRgb = hexToRgb(colors.primary) || { r: 21, g: 90, b: 145 };
+    const variables = {
+      "--bg": colors.background,
+      "--bg-end": colors.backgroundEnd,
+      "--bg-soft": colors.backgroundSoft,
+      "--ink": "#102b42",
+      "--muted": mixHex(colors.primary, "#6b8091", 72),
+      "--blue": colors.primary,
+      "--blue-2": colors.secondary,
+      "--cyan": colors.accent,
+      "--accent": colors.accent,
+      "--line": `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, .14)`,
+      "--shadow-rgb": `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`,
+      "--header-surface": "rgba(255,255,255,.89)",
+      "--nav-surface": "rgba(250,252,255,.95)",
+      "--hero-1": "rgba(255,255,255,.98)",
+      "--hero-2": hexToRgba(colors.background, .86),
+      "--soft-tint": mixHex(colors.primary, "#ffffff", 88),
+      "--soft-tint-2": mixHex(colors.accent, "#ffffff", 90),
+      "--card-bg-1": colors.cardStart,
+      "--card-bg-2": colors.cardEnd,
+      "--card-ink": colors.cardInk,
+      "--card-muted": colors.cardMuted,
+      "--card-line": hexToRgba(colors.accent, .38)
+    };
+    Object.entries(variables).forEach(([name, value]) => root.style.setProperty(name, value));
+  }
+
+  function applyUniversityTheme(universityValue, remember = true) {
+    const university = normalizeUniversity(universityValue);
+    cardData.university = university;
+    document.documentElement.dataset.university = university.entityId || (university.name ? "custom" : "blank");
+    applyCssVariables(university.colors);
+
+    if (els.themeColorMeta) els.themeColorMeta.content = university.colors.background;
+    setUniversityLogo(els.headerUniversityLogo, null, university);
+    setUniversityLogo(els.authUniversityLogo, null, university);
+    setUniversityLogo(els.cardUniversityLogo, null, university);
+    if (els.courseUniversityLabel) els.courseUniversityLabel.textContent = university.name || "Universidade não definida";
+    if (els.cardInstitutionLabel) {
+      els.cardInstitutionLabel.textContent = university.name
+        ? university.name.toUpperCase()
+        : "IDENTIFICAÇÃO ACADÊMICA";
+    }
+    document.title = university.name ? `Portal Acadêmico · ${university.shortName || university.name}` : "Portal Acadêmico";
+    renderSelectedUniversity();
+    if (remember) localStorage.setItem("portal-carteirinhas:last-university", JSON.stringify(university));
+  }
+
+  function hexToRgb(hex) {
+    const normalized = normalizeHex(hex);
+    if (!normalized) return null;
+    return {
+      r: Number.parseInt(normalized.slice(1, 3), 16),
+      g: Number.parseInt(normalized.slice(3, 5), 16),
+      b: Number.parseInt(normalized.slice(5, 7), 16)
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    return `#${[r, g, b].map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  function mixHex(colorA, colorB, percentageOfB = 50) {
+    const a = hexToRgb(colorA) || hexToRgb(DEFAULT_COLORS.primary);
+    const b = hexToRgb(colorB) || hexToRgb("#ffffff");
+    const ratio = clamp(Number(percentageOfB) / 100, 0, 1);
+    return rgbToHex(
+      a.r * (1 - ratio) + b.r * ratio,
+      a.g * (1 - ratio) + b.g * ratio,
+      a.b * (1 - ratio) + b.b * ratio
+    );
+  }
+
+  function hexToRgba(hex, alpha) {
+    const rgb = hexToRgb(hex) || { r: 21, g: 90, b: 145 };
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+  }
+
+  function relativeLuminance(hex) {
+    const rgb = hexToRgb(hex) || { r: 0, g: 0, b: 0 };
+    const values = [rgb.r, rgb.g, rgb.b].map((value) => {
+      const channel = value / 255;
+      return channel <= .03928 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+    });
+    return .2126 * values[0] + .7152 * values[1] + .0722 * values[2];
+  }
+
+  function contrastText(background, dark = "#102b42", light = "#ffffff") {
+    return relativeLuminance(background) > .48 ? dark : light;
+  }
+
+  function rgbToHsl(r, g, b) {
+    const rn = r / 255;
+    const gn = g / 255;
+    const bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const delta = max - min;
+    let h = 0;
+    if (delta) {
+      if (max === rn) h = ((gn - bn) / delta) % 6;
+      else if (max === gn) h = (bn - rn) / delta + 2;
+      else h = (rn - gn) / delta + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    const l = (max + min) / 2;
+    const s = delta ? delta / (1 - Math.abs(2 * l - 1)) : 0;
+    return { h, s, l };
+  }
+
+  function hslToHex(h, s, l) {
+    const saturation = clamp(s, 0, 100) / 100;
+    const lightness = clamp(l, 0, 100) / 100;
+    const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+    const x = chroma * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = lightness - chroma / 2;
+    let [r, g, b] = [0, 0, 0];
+    if (h < 60) [r, g, b] = [chroma, x, 0];
+    else if (h < 120) [r, g, b] = [x, chroma, 0];
+    else if (h < 180) [r, g, b] = [0, chroma, x];
+    else if (h < 240) [r, g, b] = [0, x, chroma];
+    else if (h < 300) [r, g, b] = [x, 0, chroma];
+    else [r, g, b] = [chroma, 0, x];
+    return rgbToHex((r + m) * 255, (g + m) * 255, (b + m) * 255);
+  }
+
+  function deterministicColor(seed) {
+    let hash = 0;
+    for (const char of String(seed || "universidade")) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+    return hslToHex(Math.abs(hash) % 360, 62, 38);
+  }
+
+  function buildColorTheme(primaryValue, accentValue, name = "") {
+    const primary = normalizeHex(primaryValue, deterministicColor(name));
+    let accent = normalizeHex(accentValue, "");
+    const primaryRgb = hexToRgb(primary);
+    const primaryHsl = rgbToHsl(primaryRgb.r, primaryRgb.g, primaryRgb.b);
+    if (!accent || Math.abs(relativeLuminance(accent) - relativeLuminance(primary)) < .04) {
+      accent = hslToHex((primaryHsl.h + 155) % 360, Math.max(58, primaryHsl.s * 100), primaryHsl.l > .58 ? 38 : 58);
+    }
+    const primaryIsLight = relativeLuminance(primary) > .53;
+    const secondary = primaryIsLight ? mixHex(primary, "#000000", 28) : mixHex(primary, "#ffffff", 18);
+    const cardStart = primaryIsLight ? mixHex(primary, "#ffffff", 62) : mixHex(primary, "#ffffff", 5);
+    const cardEnd = primaryIsLight ? mixHex(primary, "#ffffff", 42) : mixHex(primary, "#000000", 24);
+    const cardInk = contrastText(cardEnd);
+    const cardMuted = cardInk === "#ffffff" ? mixHex("#ffffff", cardEnd, 24) : mixHex(cardInk, cardEnd, 48);
+    return {
+      primary,
+      secondary,
+      accent,
+      background: mixHex(primary, "#ffffff", 91),
+      backgroundEnd: mixHex(primary, "#ffffff", 84),
+      backgroundSoft: mixHex(primary, "#ffffff", 97),
+      cardStart,
+      cardEnd,
+      cardInk,
+      cardMuted
+    };
+  }
+
+  function claimValue(entity, property) {
+    return entity?.claims?.[property]?.[0]?.mainsnak?.datavalue?.value ?? null;
+  }
+
+  function localizedValue(collection, fallback = "") {
+    return collection?.["pt-br"]?.value || collection?.pt?.value || collection?.en?.value || fallback;
+  }
+
+  async function mediaWikiRequest(endpoint, params, signal) {
+    const url = new URL(endpoint);
+    Object.entries({ ...params, format: "json", origin: "*" }).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));
+    });
+    const response = await fetch(url, { signal, headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`A busca online respondeu com o código ${response.status}.`);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.info || "Não foi possível consultar a fonte pública.");
+    return data;
+  }
+
+  function fileTitleKey(value) {
+    return String(value || "").replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
+  }
+
+  async function resolveCommonsFiles(fileNames, signal) {
+    const names = [...new Set(fileNames.filter(Boolean))];
+    if (!names.length) return new Map();
+    const data = await mediaWikiRequest(COMMONS_API, {
+      action: "query",
+      prop: "imageinfo",
+      titles: names.map((name) => `File:${name}`).join("|"),
+      iiprop: "url|mime",
+      iiurlwidth: 900
+    }, signal);
+    const map = new Map();
+    Object.values(data.query?.pages || {}).forEach((page) => {
+      const info = page.imageinfo?.[0];
+      if (!info) return;
+      map.set(fileTitleKey(page.title), {
+        title: page.title,
+        url: info.thumburl || info.url || "",
+        originalUrl: info.url || "",
+        mime: info.thumbmime || info.mime || ""
+      });
+    });
+    return map;
+  }
+
+  async function searchCommonsLogos(name, signal) {
+    const cleanName = String(name || "").replace(/["']/g, " ").trim();
+    if (!cleanName) return [];
+    const searches = [`intitle:"${cleanName}" logo`, `"${cleanName}" logotipo`, `"${cleanName}" logo`];
+    const found = new Map();
+    for (const query of searches) {
+      try {
+        const data = await mediaWikiRequest(COMMONS_API, {
+          action: "query",
+          generator: "search",
+          gsrsearch: query,
+          gsrnamespace: 6,
+          gsrlimit: 8,
+          prop: "imageinfo",
+          iiprop: "url|mime",
+          iiurlwidth: 900
+        }, signal);
+        Object.values(data.query?.pages || {}).forEach((page) => {
+          const info = page.imageinfo?.[0];
+          const url = info?.thumburl || info?.url || "";
+          if (!url || !/^image\//.test(info?.thumbmime || info?.mime || "image/")) return;
+          const key = fileTitleKey(page.title);
+          if (!found.has(key)) found.set(key, { title: page.title, url, originalUrl: info.url || url });
+        });
+      } catch (error) {
+        if (error.name === "AbortError") throw error;
+        console.warn("Busca complementar de logo:", error.message);
+      }
+      if (found.size >= 5) break;
+    }
+    return [...found.values()].slice(0, 5);
+  }
+
+  function parseSearchEntity(entity, searchItem, logoMap) {
+    const logoFile = claimValue(entity, "P154");
+    const colorClaim = claimValue(entity, "P465");
+    const website = claimValue(entity, "P856") || "";
+    const logoInfo = logoFile ? logoMap.get(fileTitleKey(logoFile)) : null;
+    const name = localizedValue(entity.labels, searchItem?.label || entity.id);
+    return {
+      entityId: entity.id,
+      name,
+      shortName: name,
+      description: localizedValue(entity.descriptions, searchItem?.description || "Instituição de ensino"),
+      website: typeof website === "string" ? website : "",
+      logoUrl: logoInfo?.url || "",
+      logoTitle: logoInfo?.title || (logoFile ? `File:${logoFile}` : ""),
+      sourceUrl: `https://www.wikidata.org/wiki/${entity.id}`,
+      claimedColor: normalizeHex(colorClaim, "")
+    };
+  }
+
+  async function searchUniversityEntities(query, signal) {
+    const searchById = new Map();
+    for (const language of ["pt-br", "pt", "en"]) {
+      const searchData = await mediaWikiRequest(WIKIDATA_API, {
+        action: "wbsearchentities",
+        search: query,
+        language,
+        uselang: "pt-br",
+        type: "item",
+        limit: 10
+      }, signal);
+      (searchData.search || []).forEach((item) => {
+        if (!searchById.has(item.id)) searchById.set(item.id, item);
+      });
+      if (searchById.size >= 8) break;
+    }
+
+    const searchItems = [...searchById.values()].slice(0, 10);
+    if (!searchItems.length) return [];
+    const ids = searchItems.map((item) => item.id).join("|");
+    const entityData = await mediaWikiRequest(WIKIDATA_API, {
+      action: "wbgetentities",
+      ids,
+      props: "labels|descriptions|claims",
+      languages: "pt-br|pt|en"
+    }, signal);
+    const entities = entityData.entities || {};
+    const logos = searchItems.map((item) => claimValue(entities[item.id], "P154")).filter(Boolean);
+    const logoMap = await resolveCommonsFiles(logos, signal);
+    return searchItems
+      .map((item) => parseSearchEntity(entities[item.id] || {}, item, logoMap))
+      .filter((item) => item.name);
+  }
+
+  function imageFromBlob(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      image.onload = () => { URL.revokeObjectURL(url); resolve(image); };
+      image.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Não foi possível analisar as cores do logo.")); };
+      image.src = url;
+    });
+  }
+
+  async function extractLogoColors(url) {
+    if (!url) return [];
+    try {
+      const response = await fetch(url, { mode: "cors", credentials: "omit" });
+      if (!response.ok) throw new Error("Logo indisponível para análise.");
+      const image = await imageFromBlob(await response.blob());
+      const canvas = document.createElement("canvas");
+      canvas.width = 96;
+      canvas.height = 96;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.clearRect(0, 0, 96, 96);
+      const scale = Math.min(92 / image.naturalWidth, 92 / image.naturalHeight);
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      context.drawImage(image, (96 - width) / 2, (96 - height) / 2, width, height);
+      const pixels = context.getImageData(0, 0, 96, 96).data;
+      const buckets = new Map();
+      for (let index = 0; index < pixels.length; index += 16) {
+        const alpha = pixels[index + 3];
+        if (alpha < 100) continue;
+        const r = pixels[index];
+        const g = pixels[index + 1];
+        const b = pixels[index + 2];
+        const hsl = rgbToHsl(r, g, b);
+        if (hsl.l > .94 || hsl.l < .04) continue;
+        const qr = Math.round(r / 24) * 24;
+        const qg = Math.round(g / 24) * 24;
+        const qb = Math.round(b / 24) * 24;
+        const key = `${qr},${qg},${qb}`;
+        const score = .35 + hsl.s * 1.8 + (1 - Math.abs(hsl.l - .48)) * .7;
+        buckets.set(key, (buckets.get(key) || 0) + score);
+      }
+      return [...buckets.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([key]) => rgbToHex(...key.split(",").map(Number)))
+        .filter((color, index, array) => array.findIndex((other) => Math.abs(relativeLuminance(other) - relativeLuminance(color)) < .025) === index)
+        .slice(0, 5);
+    } catch (error) {
+      console.warn("Análise de cores:", error.message);
+      return [];
+    }
+  }
+
+  async function createUniversityTheme(candidate, logoChoice) {
+    const selectedLogo = logoChoice || (candidate.logoUrl ? { url: candidate.logoUrl, title: candidate.logoTitle } : null);
+    const extracted = selectedLogo?.url ? await extractLogoColors(selectedLogo.url) : [];
+    const primary = candidate.claimedColor || extracted[0] || deterministicColor(candidate.name);
+    const accent = extracted.find((color) => Math.abs(relativeLuminance(color) - relativeLuminance(primary)) > .07) || extracted[1] || "";
+    return normalizeUniversity({
+      ...candidate,
+      logoUrl: selectedLogo?.url || "",
+      logoTitle: selectedLogo?.title || "",
+      colors: buildColorTheme(primary, accent, candidate.name)
+    });
+  }
+
+  function renderSelectedUniversity() {
+    if (!els.selectedUniversityPanel) return;
+    const university = currentUniversity();
+    const selected = Boolean(university.name);
+    els.selectedUniversityPanel.classList.toggle("is-empty", !selected);
+    els.selectedUniversityName.textContent = selected ? university.name : "Nenhuma universidade escolhida";
+    els.selectedUniversityDescription.textContent = selected
+      ? (university.description || "Identidade visual selecionada para o portal.")
+      : "Use a busca online para localizar sua instituição e conferir o logo antes de aplicar.";
+    setUniversityLogo(els.selectedUniversityLogo, els.selectedUniversityInitial, university);
+    if (els.universitySearchInput && document.activeElement !== els.universitySearchInput) {
+      els.universitySearchInput.value = university.name || "";
+    }
+    if (els.changeUniversityButton) els.changeUniversityButton.textContent = selected ? "Trocar" : "Buscar";
+  }
+
+  function openUniversityModal(query = "") {
+    els.universityModal.hidden = false;
+    document.body.classList.add("modal-open");
+    els.universityModalQuery.value = query || els.universitySearchInput.value.trim() || currentUniversity().name;
+    universityPreviewCandidate = null;
+    els.universityPreview.hidden = true;
+    els.universityModalApplyButton.disabled = true;
+    window.setTimeout(() => els.universityModalQuery.focus(), 60);
+    if (els.universityModalQuery.value.trim()) performUniversitySearch();
+  }
+
+  function closeUniversityModal() {
+    universitySearchController?.abort();
+    universitySearchController = null;
+    els.universityModal.hidden = true;
+    if (els.cropModal.hidden) document.body.classList.remove("modal-open");
+  }
+
+  function renderUniversityResults(results) {
+    els.universitySearchResults.innerHTML = "";
+    results.forEach((item, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "university-result";
+      button.dataset.index = String(index);
+      const media = document.createElement("span");
+      media.className = "university-result__media";
+      if (item.logoUrl) {
+        const image = document.createElement("img");
+        image.src = item.logoUrl;
+        image.alt = "";
+        media.appendChild(image);
+      } else {
+        media.textContent = initials(item.name).slice(0, 2);
+      }
+      const copy = document.createElement("span");
+      copy.className = "university-result__copy";
+      const name = document.createElement("strong");
+      name.textContent = item.name;
+      const description = document.createElement("small");
+      description.textContent = item.description || "Instituição encontrada na busca pública";
+      copy.append(name, description);
+      const action = document.createElement("span");
+      action.className = "university-result__action";
+      action.textContent = item.isCustom ? "Buscar logo" : "Conferir";
+      button.append(media, copy, action);
+      button.addEventListener("click", () => prepareUniversityPreview(index));
+      els.universitySearchResults.appendChild(button);
+    });
+  }
+
+  async function performUniversitySearch() {
+    const query = els.universityModalQuery.value.trim();
+    if (query.length < 2) {
+      els.universitySearchStatus.textContent = "Digite pelo menos duas letras para pesquisar.";
+      els.universityModalQuery.focus();
+      return;
+    }
+    universitySearchController?.abort();
+    universitySearchController = new AbortController();
+    universityPreviewCandidate = null;
+    els.universityPreview.hidden = true;
+    els.universityModalApplyButton.disabled = true;
+    els.universitySearchResults.innerHTML = "";
+    els.universitySearchStatus.innerHTML = '<span class="search-spinner" aria-hidden="true"></span> Buscando universidades e identidades visuais…';
+    els.universityModalSearchButton.disabled = true;
+    try {
+      universitySearchResults = await searchUniversityEntities(query, universitySearchController.signal);
+      const normalizedQuery = query.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ").trim();
+      const hasExactResult = universitySearchResults.some((item) => item.name.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ").trim() === normalizedQuery);
+      if (!hasExactResult) {
+        universitySearchResults.push({
+          entityId: `custom-${Date.now()}`,
+          name: query,
+          shortName: query,
+          description: "Usar exatamente o nome informado e procurar logos públicos relacionados.",
+          website: "",
+          logoUrl: "",
+          logoTitle: "",
+          sourceUrl: "",
+          claimedColor: "",
+          isCustom: true
+        });
+      }
+      els.universitySearchStatus.textContent = universitySearchResults.length > 1
+        ? `${universitySearchResults.length} opção(ões). Selecione a instituição correta para conferir o logo.`
+        : "A busca livre está disponível. Confira os logos encontrados antes de aplicar.";
+      renderUniversityResults(universitySearchResults);
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error(error);
+      universitySearchResults = [{
+        entityId: `custom-${Date.now()}`,
+        name: query,
+        shortName: query,
+        description: "Busca livre pelo nome informado. Confira os logos públicos encontrados antes de aplicar.",
+        website: "",
+        logoUrl: "",
+        logoTitle: "",
+        sourceUrl: "",
+        claimedColor: "",
+        isCustom: true
+      }];
+      els.universitySearchStatus.textContent = "A consulta principal não respondeu, mas a busca livre pelo nome informado continua disponível.";
+      renderUniversityResults(universitySearchResults);
+    } finally {
+      els.universityModalSearchButton.disabled = false;
+    }
+  }
+
+  function renderLogoChoices(choices, selectedUrl) {
+    els.universityLogoChoices.innerHTML = "";
+    if (choices.length <= 1) {
+      els.universityLogoChoices.hidden = true;
+      return;
+    }
+    els.universityLogoChoices.hidden = false;
+    choices.forEach((choice) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "logo-choice";
+      button.classList.toggle("active", choice.url === selectedUrl);
+      button.title = "Usar este logo";
+      const image = document.createElement("img");
+      image.src = choice.url;
+      image.alt = "Alternativa de logo";
+      button.appendChild(image);
+      button.addEventListener("click", async () => {
+        if (!universityPreviewCandidate) return;
+        els.universityModalApplyButton.disabled = true;
+        universityPreviewCandidate.theme = await createUniversityTheme(universityPreviewCandidate.base, choice);
+        universityPreviewCandidate.selectedLogo = choice;
+        renderUniversityPreview();
+      });
+      els.universityLogoChoices.appendChild(button);
+    });
+  }
+
+  function renderUniversityPreview() {
+    const state = universityPreviewCandidate;
+    if (!state?.theme) return;
+    const university = state.theme;
+    els.universityPreview.hidden = false;
+    els.universityPreviewName.textContent = university.name;
+    els.universityPreviewDescription.textContent = university.description || "Instituição de ensino";
+    if (university.website) {
+      els.universityPreviewWebsite.href = university.website;
+      els.universityPreviewWebsite.textContent = (() => {
+        try { return new URL(university.website).hostname.replace(/^www\./, ""); }
+        catch { return "Site oficial informado"; }
+      })();
+      els.universityPreviewWebsite.hidden = false;
+    } else {
+      els.universityPreviewWebsite.hidden = true;
+    }
+    setUniversityLogo(els.universityPreviewLogo, els.universityPreviewInitial, university);
+    renderLogoChoices(state.logoChoices, university.logoUrl);
+    const swatches = [university.colors.primary, university.colors.secondary, university.colors.accent];
+    els.universityColorSwatches.innerHTML = "";
+    swatches.forEach((color) => {
+      const span = document.createElement("span");
+      span.style.background = color;
+      span.title = color;
+      els.universityColorSwatches.appendChild(span);
+    });
+    els.universityMiniPreview.style.setProperty("--preview-primary", university.colors.primary);
+    els.universityMiniPreview.style.setProperty("--preview-accent", university.colors.accent);
+    els.universityMiniPreview.style.setProperty("--preview-bg", university.colors.background);
+    els.universityMiniPreview.style.setProperty("--preview-card", university.colors.cardStart);
+    const miniLogo = els.universityMiniPreview.querySelector("img");
+    const miniInitial = els.universityMiniPreview.querySelector("span");
+    setUniversityLogo(miniLogo, miniInitial, university);
+    els.universityModalApplyButton.disabled = false;
+    els.universityPreview.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function prepareUniversityPreview(index) {
+    const candidate = universitySearchResults[index];
+    if (!candidate) return;
+    [...els.universitySearchResults.querySelectorAll(".university-result")].forEach((item) => {
+      item.classList.toggle("active", Number(item.dataset.index) === index);
+    });
+    els.universitySearchStatus.innerHTML = '<span class="search-spinner" aria-hidden="true"></span> Preparando a prévia da identidade visual…';
+    els.universityModalApplyButton.disabled = true;
+    try {
+      let logoChoices = candidate.logoUrl ? [{ title: candidate.logoTitle, url: candidate.logoUrl }] : [];
+      const extraChoices = await searchCommonsLogos(candidate.name, universitySearchController?.signal);
+      extraChoices.forEach((choice) => {
+        if (!logoChoices.some((item) => item.url === choice.url)) logoChoices.push(choice);
+      });
+      logoChoices = logoChoices.slice(0, 5);
+      const selectedLogo = logoChoices[0] || null;
+      const theme = await createUniversityTheme(candidate, selectedLogo);
+      universityPreviewCandidate = { base: candidate, logoChoices, selectedLogo, theme };
+      els.universitySearchStatus.textContent = logoChoices.length
+        ? "Confira o logo, as cores e a instituição antes de aplicar."
+        : "A instituição foi encontrada, mas não houve logo disponível. Será usado um símbolo com as iniciais.";
+      renderUniversityPreview();
+    } catch (error) {
+      if (error.name === "AbortError") return;
+      console.error(error);
+      els.universitySearchStatus.textContent = "Não foi possível preparar esta identidade. Escolha outro resultado ou tente novamente.";
+    }
+  }
+
+  function applyUniversityPreview() {
+    if (!universityPreviewCandidate?.theme) return;
+    cardData.university = normalizeUniversity(universityPreviewCandidate.theme);
+    applyUniversityTheme(cardData.university);
+    els.universitySearchInput.value = cardData.university.name;
+    els.syncBadge.textContent = "Alterações pendentes";
+    closeUniversityModal();
+    showToast(`Identidade de ${cardData.university.name} aplicada. Salve as informações para confirmar.`);
   }
 
   function randomInteger(max) {
@@ -276,15 +951,15 @@
   }
 
   function fillProfileForm() {
-    els.universitySelect.value = normalizeUniversity(cardData.university);
+    els.universitySearchInput.value = currentUniversity().name || "";
     els.studentNameInput.value = cardData.studentName;
     els.courseInput.value = cardData.course;
     els.registrationInput.value = cardData.registration;
     els.validUntilInput.value = cardData.validUntil;
+    renderSelectedUniversity();
   }
 
   function syncCardDataFromProfileForm() {
-    const university = normalizeUniversity(els.universitySelect.value);
     const studentName = els.studentNameInput.value.trim();
     const course = els.courseInput.value.trim();
     const registration = els.registrationInput.value.trim();
@@ -294,7 +969,7 @@
     if (course) cardData.course = course;
     if (registration) cardData.registration = registration;
     if (validUntil) cardData.validUntil = validUntil;
-    cardData.university = university;
+    cardData.university = normalizeUniversity(cardData.university);
   }
 
   function renderCard() {
@@ -354,9 +1029,9 @@
       const saved = JSON.parse(localStorage.getItem(localKey()) || "null");
       cardData = saved && typeof saved === "object"
         ? { ...DEFAULT_CARD, ...saved, university: normalizeUniversity(saved.university), photoUrl: "" }
-        : { ...DEFAULT_CARD };
+        : { ...DEFAULT_CARD, university: blankUniversity() };
     } catch {
-      cardData = { ...DEFAULT_CARD };
+      cardData = { ...DEFAULT_CARD, university: blankUniversity() };
     }
   }
 
@@ -372,15 +1047,31 @@
     return data?.signedUrl || "";
   }
 
+  function isMissingThemeColumn(error) {
+    const text = `${error?.code || ""} ${error?.message || ""} ${error?.details || ""}`.toLowerCase();
+    return text.includes("university_theme") || text.includes("pgrst204") || text.includes("42703");
+  }
+
   async function loadRemote() {
     if (!supabaseClient || !currentUser) return;
 
-    const { data, error } = await supabaseClient
+    let response = await supabaseClient
       .from(TABLE_NAME)
-      .select("student_name, course_name, registration_number, valid_until, university, photo_path")
+      .select("student_name, course_name, registration_number, valid_until, university, university_theme, photo_path")
       .eq("user_id", currentUser.id)
       .maybeSingle();
 
+    let usingLegacySchema = false;
+    if (response.error && isMissingThemeColumn(response.error)) {
+      usingLegacySchema = true;
+      response = await supabaseClient
+        .from(TABLE_NAME)
+        .select("student_name, course_name, registration_number, valid_until, university, photo_path")
+        .eq("user_id", currentUser.id)
+        .maybeSingle();
+    }
+
+    const { data, error } = response;
     if (error) {
       console.warn("Falha ao carregar a carteirinha:", error.message);
       els.syncBadge.textContent = "Somente local";
@@ -399,15 +1090,14 @@
       course: data.course_name || DEFAULT_CARD.course,
       registration: data.registration_number || DEFAULT_CARD.registration,
       validUntil: data.valid_until || DEFAULT_CARD.validUntil,
-      university: normalizeUniversity(data.university),
+      university: normalizeUniversity(data.university_theme && Object.keys(data.university_theme).length ? data.university_theme : data.university),
       photoPath: data.photo_path || "",
       localPhoto: "",
       photoUrl: ""
     };
 
-    if (cardData.photoPath) {
-      cardData.photoUrl = await createPhotoSignedUrl(cardData.photoPath);
-    }
+    if (usingLegacySchema) els.syncBadge.textContent = "Atualização necessária";
+    if (cardData.photoPath) cardData.photoUrl = await createPhotoSignedUrl(cardData.photoPath);
   }
 
   async function saveRemote() {
@@ -419,17 +1109,29 @@
       course_name: cardData.course,
       registration_number: cardData.registration,
       valid_until: cardData.validUntil,
-      university: normalizeUniversity(cardData.university),
+      university: currentUniversity().name || "",
+      university_theme: normalizeUniversity(cardData.university),
       photo_path: cardData.photoPath || null,
       updated_at: new Date().toISOString()
     };
 
-    const { error } = await supabaseClient
+    let response = await supabaseClient
       .from(TABLE_NAME)
       .upsert(payload, { onConflict: "user_id" });
 
-    if (error) {
-      console.error(error);
+    if (response.error && isMissingThemeColumn(response.error)) {
+      const { university_theme: ignoredTheme, ...legacyPayload } = payload;
+      response = await supabaseClient
+        .from(TABLE_NAME)
+        .upsert(legacyPayload, { onConflict: "user_id" });
+      if (!response.error) {
+        els.syncBadge.textContent = "Atualização necessária";
+        return false;
+      }
+    }
+
+    if (response.error) {
+      console.error(response.error);
       els.syncBadge.textContent = "Somente local";
       return false;
     }
@@ -737,6 +1439,7 @@
 
   function showAuth() {
     if (!els.cropModal.hidden) closeCropModal();
+    if (!els.universityModal.hidden) closeUniversityModal();
     els.authScreen.hidden = false;
     els.appShell.hidden = true;
   }
@@ -769,7 +1472,12 @@
   async function logout() {
     if (supabaseClient) await supabaseClient.auth.signOut();
     currentUser = null;
-    const rememberedUniversity = normalizeUniversity(localStorage.getItem("portal-carteirinhas:last-university"));
+    let rememberedUniversity = blankUniversity();
+    try {
+      rememberedUniversity = normalizeUniversity(JSON.parse(localStorage.getItem("portal-carteirinhas:last-university") || "null"));
+    } catch {
+      rememberedUniversity = blankUniversity();
+    }
     cardData = { ...DEFAULT_CARD, university: rememberedUniversity };
     applyUniversityTheme(rememberedUniversity, false);
     showAuth();
@@ -782,10 +1490,24 @@
     els.notificationButton.addEventListener("click", () => showToast("Nenhuma nova notificação no momento."));
     els.googleLoginButton.addEventListener("click", signInWithGoogle);
     els.logoutButton.addEventListener("click", logout);
-    els.universitySelect.addEventListener("change", () => {
-      cardData.university = normalizeUniversity(els.universitySelect.value);
-      applyUniversityTheme(cardData.university);
-      showToast(`Identidade visual alterada para ${currentUniversity().name}. Salve para confirmar.`);
+    els.universitySearchButton.addEventListener("click", () => openUniversityModal(els.universitySearchInput.value.trim()));
+    els.changeUniversityButton.addEventListener("click", () => openUniversityModal(els.universitySearchInput.value.trim()));
+    els.universitySearchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        openUniversityModal(els.universitySearchInput.value.trim());
+      }
+    });
+    els.universityModalBackdrop.addEventListener("click", closeUniversityModal);
+    els.universityModalCloseButton.addEventListener("click", closeUniversityModal);
+    els.universityModalCancelButton.addEventListener("click", closeUniversityModal);
+    els.universityModalApplyButton.addEventListener("click", applyUniversityPreview);
+    els.universityModalSearchButton.addEventListener("click", performUniversitySearch);
+    els.universityModalQuery.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        performUniversitySearch();
+      }
     });
     els.studentPhotoInput.addEventListener("change", () => openPhotoCropper(els.studentPhotoInput.files?.[0]));
     els.removePhotoButton.addEventListener("click", removePhoto);
@@ -812,7 +1534,9 @@
     });
     window.addEventListener("resize", updateCropPreview);
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !els.cropModal.hidden) closeCropModal();
+      if (event.key !== "Escape") return;
+      if (!els.universityModal.hidden) closeUniversityModal();
+      else if (!els.cropModal.hidden) closeCropModal();
     });
 
     els.validUntilInput.addEventListener("input", () => {
@@ -821,7 +1545,12 @@
 
     els.profileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      cardData.university = normalizeUniversity(els.universitySelect.value);
+      if (!currentUniversity().name) {
+        showToast("Busque e selecione sua universidade antes de salvar.");
+        openUniversityModal(els.universitySearchInput.value.trim());
+        return;
+      }
+      cardData.university = normalizeUniversity(cardData.university);
       cardData.studentName = els.studentNameInput.value.trim();
       cardData.course = els.courseInput.value.trim();
       cardData.registration = els.registrationInput.value.trim();
@@ -892,7 +1621,12 @@
   }
 
   async function init() {
-    const rememberedUniversity = normalizeUniversity(localStorage.getItem("portal-carteirinhas:last-university"));
+    let rememberedUniversity = blankUniversity();
+    try {
+      rememberedUniversity = normalizeUniversity(JSON.parse(localStorage.getItem("portal-carteirinhas:last-university") || "null"));
+    } catch {
+      rememberedUniversity = blankUniversity();
+    }
     cardData.university = rememberedUniversity;
     applyUniversityTheme(rememberedUniversity, false);
     bindEvents();
