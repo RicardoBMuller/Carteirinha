@@ -14,8 +14,8 @@
 
   const shared = window.FCC_CONFIG || {};
   const fallback = {
-    SUPABASE_URL: "",
-    SUPABASE_PUBLISHABLE_KEY: ""
+    SUPABASE_URL: "https://fxkjikfurlvfftpncunp.supabase.co",
+    SUPABASE_PUBLISHABLE_KEY: "sb_publishable_tla6br_lPVuEPBgsMFEDCw_58Pp-7jA"
   };
 
   window.PORTAL_CONFIG = Object.freeze({
