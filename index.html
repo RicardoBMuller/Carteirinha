@@ -8,7 +8,7 @@
   <title>Portal Acadêmico</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/styles.css?v=2.0">
+  <link rel="stylesheet" href="css/styles.css?v=3.0">
 </head>
 <body>
   <div class="app-shell" id="appShell" hidden>
@@ -118,7 +118,6 @@
         <div class="page-heading page-heading--center">
           <p class="eyebrow">CARTEIRINHA VIRTUAL</p>
           <h1 id="cardTitle">Identificação estudantil</h1>
-          <p>A foto e os dados exibidos abaixo são definidos na tela de Perfil.</p>
         </div>
 
         <div class="student-card-wrap">
@@ -165,10 +164,6 @@
           </article>
         </div>
 
-        <div class="card-helper">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg>
-          <p>Para trocar a foto ou alterar os dados, abra <strong>Perfil</strong> no menu inferior.</p>
-        </div>
       </section>
 
       <section class="view" id="view-questions" data-view="questions" aria-labelledby="questionsTitle" hidden>
@@ -185,7 +180,7 @@
           </details>
           <details>
             <summary>Como colocar a foto no quadrado da carteirinha?</summary>
-            <p>Na tela “Perfil”, toque em “Escolher foto”. A imagem será recortada automaticamente para preencher o quadrado.</p>
+            <p>Na tela “Perfil”, toque em “Escolher foto”. Uma prévia será aberta para ajustar o zoom e arrastar a imagem até o enquadramento desejado.</p>
           </details>
           <details>
             <summary>Preciso criar outro login Google?</summary>
@@ -229,7 +224,13 @@
 
           <label>
             <span>Matrícula (RGM)</span>
-            <input id="registrationInput" name="registration" type="text" maxlength="25" placeholder="Ex.: 03722861-7" required>
+            <div class="input-with-action">
+              <input id="registrationInput" name="registration" type="text" maxlength="25" placeholder="Ex.: 03722861-7" required>
+              <button class="field-action-button" id="randomRegistrationButton" type="button" aria-label="Gerar RGM aleatório">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="8" cy="8" r=".8"/><circle cx="16" cy="8" r=".8"/><circle cx="8" cy="16" r=".8"/><circle cx="16" cy="16" r=".8"/><circle cx="12" cy="12" r=".8"/></svg>
+                <span>Gerar</span>
+              </button>
+            </div>
           </label>
 
           <label>
@@ -315,11 +316,47 @@
     </div>
   </div>
 
+  <div class="crop-modal" id="cropModal" hidden role="dialog" aria-modal="true" aria-labelledby="cropModalTitle">
+    <button class="crop-modal__backdrop" id="cropBackdrop" type="button" aria-label="Fechar ajuste da foto"></button>
+    <section class="crop-dialog">
+      <header class="crop-dialog__header">
+        <div>
+          <p class="eyebrow">ENQUADRAMENTO</p>
+          <h2 id="cropModalTitle">Ajustar foto</h2>
+        </div>
+        <button class="crop-close-button" id="cropCloseButton" type="button" aria-label="Fechar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <p class="crop-instructions">Arraste a foto para reposicionar e use o controle abaixo para aumentar ou diminuir.</p>
+
+      <div class="crop-stage" id="cropStage">
+        <img id="cropImage" alt="Prévia para enquadramento" draggable="false">
+        <div class="crop-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="crop-control">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M8 11h6"/></svg>
+        <input id="cropZoom" type="range" min="1" max="3.5" value="1" step="0.01" aria-label="Zoom da foto">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4M8 11h6M11 8v6"/></svg>
+      </div>
+
+      <div class="crop-actions">
+        <button class="secondary-button crop-cancel-button" id="cropCancelButton" type="button">Cancelar</button>
+        <button class="primary-button crop-apply-button" id="cropApplyButton" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg>
+          Usar esta foto
+        </button>
+      </div>
+    </section>
+  </div>
+
   <div class="toast" id="toast" role="status" hidden></div>
 
   <!-- Reutiliza o MESMO config.js já publicado pelo Portal FCC. -->
   <script src="https://ricardobmuller.github.io/Portal-FCC/config.js"></script>
-  <script src="js/config.js?v=2.0"></script>
-  <script src="js/app.js?v=2.0"></script>
+  <script src="js/config.js?v=3.0"></script>
+  <script src="js/app.js?v=3.0"></script>
 </body>
 </html>

@@ -33,6 +33,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+body.modal-open { overflow: hidden; }
+
 button, input { font: inherit; }
 button { color: inherit; }
 button, label[for] { -webkit-tap-highlight-color: transparent; }
@@ -260,6 +262,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .profile-form label > span, .readonly-field > span { display: block; margin: 0 0 7px 3px; color: #436379; font-size: .76rem; font-weight: 800; }
 .profile-form input { width: 100%; height: 52px; padding: 0 15px; border: 1px solid rgba(29, 95, 141, .16); border-radius: 15px; outline: none; color: var(--ink); background: #f8fcff; transition: border-color .2s ease, box-shadow .2s ease; }
 .profile-form input:focus { border-color: rgba(26, 119, 177, .48); box-shadow: 0 0 0 4px rgba(36, 137, 194, .09); }
+.input-with-action { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; }
+.field-action-button { display: inline-flex; min-width: 92px; height: 52px; padding: 0 14px; align-items: center; justify-content: center; gap: 7px; border: 1px solid rgba(21, 90, 145, .16); border-radius: 15px; color: var(--blue); background: #eaf6fd; font-size: .76rem; font-weight: 900; cursor: pointer; transition: transform .18s ease, background .18s ease; }
+.field-action-button:active { transform: scale(.97); }
+.field-action-button svg { width: 18px; height: 18px; }
 .readonly-field { padding: 14px 16px; border: 1px dashed rgba(31, 103, 151, .18); border-radius: 15px; background: #f3f9fd; }
 .readonly-field > span { margin-left: 0; }
 .readonly-field strong { font-size: .92rem; }
@@ -321,6 +327,28 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .demo-button { margin-top: 10px; color: white; background: linear-gradient(135deg, #155a91, #61bfce); }
 .auth-hint { display: block; margin-top: 17px; color: #7890a1; line-height: 1.45; }
 
+.crop-modal { position: fixed; z-index: 200; inset: 0; display: grid; padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px)); place-items: center; }
+.crop-modal__backdrop { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; background: rgba(10, 31, 47, .68); backdrop-filter: blur(9px); cursor: default; }
+.crop-dialog { position: relative; z-index: 1; width: min(100%, 480px); max-height: calc(100dvh - 32px); overflow: auto; padding: 23px; border: 1px solid rgba(255,255,255,.48); border-radius: 29px; background: #f8fcff; box-shadow: 0 30px 90px rgba(8, 35, 54, .35); animation: cropDialogIn .24s ease both; }
+@keyframes cropDialogIn { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+.crop-dialog__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.crop-dialog__header h2 { margin: 0; font-size: 1.55rem; letter-spacing: -.04em; }
+.crop-close-button { display: grid; flex: 0 0 auto; width: 42px; height: 42px; padding: 0; place-items: center; border: 1px solid var(--line); border-radius: 14px; color: #49697f; background: white; cursor: pointer; }
+.crop-close-button svg { width: 20px; height: 20px; }
+.crop-instructions { margin: 12px 0 18px; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.crop-stage { position: relative; width: min(100%, 340px); aspect-ratio: 1; overflow: hidden; margin: 0 auto; border: 5px solid white; border-radius: 26px; background: #d8eaf5; box-shadow: 0 16px 35px rgba(26, 76, 111, .16); cursor: grab; touch-action: none; }
+.crop-stage.is-dragging { cursor: grabbing; }
+.crop-stage img { position: absolute; max-width: none; pointer-events: none; user-select: none; -webkit-user-drag: none; will-change: left, top, width, height; }
+.crop-grid { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to right, transparent 33.1%, rgba(255,255,255,.62) 33.2%, rgba(255,255,255,.62) 33.7%, transparent 33.8%, transparent 66.2%, rgba(255,255,255,.62) 66.3%, rgba(255,255,255,.62) 66.8%, transparent 66.9%), linear-gradient(to bottom, transparent 33.1%, rgba(255,255,255,.62) 33.2%, rgba(255,255,255,.62) 33.7%, transparent 33.8%, transparent 66.2%, rgba(255,255,255,.62) 66.3%, rgba(255,255,255,.62) 66.8%, transparent 66.9%); box-shadow: inset 0 0 0 1px rgba(21, 90, 145, .12); }
+.crop-grid i { display: none; }
+.crop-control { display: grid; grid-template-columns: 23px minmax(0, 1fr) 23px; gap: 12px; align-items: center; margin: 19px 2px 4px; color: var(--blue); }
+.crop-control svg { width: 22px; height: 22px; }
+.crop-control input[type="range"] { width: 100%; accent-color: var(--blue-2); cursor: pointer; }
+.crop-actions { display: grid; grid-template-columns: .85fr 1.35fr; gap: 10px; margin-top: 18px; }
+.crop-actions .primary-button, .crop-actions .secondary-button { width: 100%; min-height: 49px; margin: 0; }
+.crop-cancel-button { padding: 0 14px; }
+.crop-apply-button:disabled { opacity: .62; cursor: wait; }
+
 .toast { position: fixed; z-index: 100; left: 50%; bottom: calc(var(--nav-height) + var(--safe-bottom) + 24px); width: max-content; max-width: calc(100% - 32px); padding: 13px 17px; border: 1px solid rgba(255,255,255,.18); border-radius: 14px; color: white; background: rgba(19, 51, 73, .94); box-shadow: 0 14px 35px rgba(17,44,63,.25); text-align: center; font-size: .82rem; transform: translateX(-50%); animation: toastIn .25s ease both; }
 @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
@@ -346,7 +374,11 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   .profile-form { padding: 18px; }
   .photo-editor { grid-template-columns: 76px 1fr; gap: 13px; padding: 13px; }
   .photo-preview { width: 76px; height: 76px; border-radius: 19px; }
+  .crop-modal { padding: 10px; align-items: end; }
+  .crop-dialog { width: 100%; max-height: calc(100dvh - 20px); padding: 20px; border-radius: 28px 28px 22px 22px; }
+  .crop-stage { width: min(100%, 320px); }
 }
+
 
 @media (max-width: 390px) {
   .brand-lockup small { display: none; }
@@ -361,4 +393,10 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
   .photo-editor { grid-template-columns: 1fr; text-align: center; }
   .photo-preview { margin: 0 auto; }
   .photo-actions { justify-content: center; }
+  .input-with-action { grid-template-columns: minmax(0, 1fr) 58px; }
+  .field-action-button { min-width: 58px; padding: 0 10px; }
+  .field-action-button span { display: none; }
+  .crop-dialog { padding: 17px; }
+  .crop-actions { grid-template-columns: 1fr; }
 }
+

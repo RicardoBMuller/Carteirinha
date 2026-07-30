@@ -1,10 +1,10 @@
-const CACHE_NAME = "portal-carteirinhas-v2.0";
+const CACHE_NAME = "portal-carteirinhas-v3.0";
 const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css?v=2.0",
-  "./js/config.js?v=2.0",
-  "./js/app.js?v=2.0",
+  "./css/styles.css?v=3.0",
+  "./js/config.js?v=3.0",
+  "./js/app.js?v=3.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
   "./assets/icon-192.png",

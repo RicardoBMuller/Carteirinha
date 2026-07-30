@@ -1,8 +1,14 @@
-# Portal Acadêmico — Carteirinhas V2
+# Portal Acadêmico — Carteirinhas V3
 
 Portal particular para exibir duas carteirinhas estudantis separadas por conta Google.
 
 ## Alterações desta versão
+
+- ao selecionar a foto, abre uma tela de enquadramento;
+- é possível arrastar a imagem e controlar o zoom antes de salvar;
+- a prévia mostra exatamente o recorte quadrado usado na carteirinha;
+- foi adicionada a opção **Gerar** para criar um RGM aleatório no formato `00000000-0`;
+- os textos auxiliares acima e abaixo da carteirinha foram removidos;
 
 - a carteirinha agora é vertical, inspirada no modelo da Cruzeiro do Sul Virtual;
 - não existe mais upload da imagem inteira da carteirinha;
@@ -92,7 +98,7 @@ Configure:
 
 - `index.html` — telas e template vertical;
 - `css/styles.css` — identidade visual e responsividade;
-- `js/app.js` — login, navegação, edição, banco e upload da foto;
+- `js/app.js` — login, navegação, edição, enquadramento da foto, banco e upload;
 - `js/config.js` — ponte para reutilizar o config do Portal FCC;
 - `supabase/ATUALIZAR_MESMO_BANCO_FCC.sql` — migração não destrutiva;
 - `supabase/VERIFICAR_INSTALACAO.sql` — conferência opcional;
