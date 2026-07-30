@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#eef8ff">
+  <meta name="theme-color" content="#eef8ff" id="themeColorMeta">
   <meta name="description" content="Portal acadêmico particular com carteirinha estudantil virtual.">
   <title>Portal Acadêmico</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="css/styles.css?v=3.0">
+  <link rel="stylesheet" href="css/styles.css?v=4.0">
 </head>
 <body>
   <div class="app-shell" id="appShell" hidden>
@@ -18,8 +18,8 @@
       </button>
 
       <div class="brand-lockup" aria-label="Portal Acadêmico">
-        <div class="brand-symbol" aria-hidden="true">
-          <i></i><i></i><i></i><i></i>
+        <div class="brand-logo-box" aria-hidden="true">
+          <img class="brand-logo-image" id="headerUniversityLogo" src="assets/brands/cruzeiro.svg" alt="">
         </div>
         <div>
           <strong>Portal Acadêmico</strong>
@@ -54,7 +54,7 @@
         <article class="course-card">
           <div class="course-icon" aria-hidden="true">Ψ</div>
           <div class="course-card__body">
-            <span class="course-label">Cruzeiro do Sul Virtual</span>
+            <span class="course-label" id="courseUniversityLabel">Cruzeiro do Sul Virtual</span>
             <h3 id="courseNameLabel">Neuropsicologia</h3>
             <p id="courseStudentLabel">Dados acadêmicos vinculados ao perfil do estudante.</p>
             <div class="course-meta">
@@ -126,13 +126,7 @@
             <div class="student-card__pattern" aria-hidden="true"></div>
 
             <div class="university-lockup">
-              <div class="university-mark" aria-hidden="true">
-                <i></i><i></i><i></i><i></i>
-              </div>
-              <div>
-                <strong>Cruzeiro do Sul</strong>
-                <small>Virtual</small>
-              </div>
+              <img id="cardUniversityLogo" src="assets/brands/cruzeiro.svg" alt="Cruzeiro do Sul Virtual">
             </div>
 
             <div class="card-photo-frame" id="cardPhotoFrame">
@@ -158,7 +152,7 @@
 
             <div class="student-card__rule" aria-hidden="true"></div>
             <div class="student-card__institution">
-              <strong>CRUZEIRO DO SUL · PÓS-EAD</strong>
+              <strong id="cardInstitutionLabel">CRUZEIRO DO SUL · PÓS-EAD</strong>
               <span id="cardDocumentNumber">Documento acadêmico digital</span>
             </div>
           </article>
@@ -176,7 +170,7 @@
         <div class="faq-list">
           <details open>
             <summary>Como alterar os dados da carteirinha?</summary>
-            <p>Abra “Perfil”, preencha Nome do Aluno, Curso, Matrícula e Validade e toque em “Salvar informações”.</p>
+            <p>Abra “Perfil”, escolha a universidade, preencha Nome do Aluno, Curso, Matrícula e Validade e toque em “Salvar informações”.</p>
           </details>
           <details>
             <summary>Como colocar a foto no quadrado da carteirinha?</summary>
@@ -213,6 +207,18 @@
           </div>
 
           <label>
+            <span>Universidade</span>
+            <select id="universitySelect" name="university" required>
+              <option value="cruzeiro">Cruzeiro do Sul Virtual</option>
+              <option value="unibf">UniBF</option>
+              <option value="uninter">UNINTER</option>
+              <option value="sumare">Sumaré EAD</option>
+              <option value="unicesumar">UniCesumar</option>
+            </select>
+            <small class="field-help">Ao escolher, a identidade visual do portal muda imediatamente.</small>
+          </label>
+
+          <label>
             <span>Nome do Aluno</span>
             <input id="studentNameInput" name="studentName" type="text" maxlength="70" autocomplete="name" required>
           </label>
@@ -237,11 +243,6 @@
             <span>Validade</span>
             <input id="validUntilInput" name="validUntil" type="text" inputmode="numeric" maxlength="10" placeholder="Ex.: 12/2029" required>
           </label>
-
-          <div class="readonly-field">
-            <span>Instituição</span>
-            <strong>Cruzeiro do Sul Virtual</strong>
-          </div>
 
           <div class="photo-editor">
             <div class="photo-preview" id="profilePhotoPreview">
@@ -303,7 +304,7 @@
 
   <div class="auth-screen" id="authScreen">
     <div class="auth-card">
-      <div class="auth-logo"><i></i><i></i><i></i><i></i></div>
+      <div class="auth-brand-logo"><img id="authUniversityLogo" src="assets/brands/cruzeiro.svg" alt=""></div>
       <p class="eyebrow">PORTAL PARTICULAR</p>
       <h1>Carteirinha acadêmica sempre à mão.</h1>
       <p>Entre com a mesma conta Google utilizada no Portal FCC.</p>
@@ -356,7 +357,7 @@
 
   <!-- Reutiliza o MESMO config.js já publicado pelo Portal FCC. -->
   <script src="https://ricardobmuller.github.io/Portal-FCC/config.js"></script>
-  <script src="js/config.js?v=3.0"></script>
-  <script src="js/app.js?v=3.0"></script>
+  <script src="js/config.js?v=4.0"></script>
+  <script src="js/app.js?v=4.0"></script>
 </body>
 </html>

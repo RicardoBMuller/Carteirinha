@@ -1,12 +1,17 @@
-const CACHE_NAME = "portal-carteirinhas-v3.0";
+const CACHE_NAME = "portal-carteirinhas-v4-universidades";
 const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css?v=3.0",
-  "./js/config.js?v=3.0",
-  "./js/app.js?v=3.0",
+  "./css/styles.css?v=4.0",
+  "./js/config.js?v=4.0",
+  "./js/app.js?v=4.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
+  "./assets/brands/cruzeiro.svg",
+  "./assets/brands/unibf.svg",
+  "./assets/brands/uninter.svg",
+  "./assets/brands/sumare.svg",
+  "./assets/brands/unicesumar.svg",
   "./assets/icon-192.png",
   "./assets/icon-512.png"
 ];

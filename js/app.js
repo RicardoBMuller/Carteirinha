@@ -3,15 +3,52 @@
 
   const TABLE_NAME = "fcc_student_cards";
   const STORAGE_BUCKET = "fcc-student-card-photos";
-  const UNIVERSITY = "Cruzeiro do Sul Virtual";
+  const DEFAULT_UNIVERSITY = "cruzeiro";
   const CROP_OUTPUT_SIZE = 900;
+  const UNIVERSITIES = Object.freeze({
+    cruzeiro: Object.freeze({
+      name: "Cruzeiro do Sul Virtual",
+      shortName: "Cruzeiro do Sul",
+      logo: "assets/brands/cruzeiro.svg",
+      themeColor: "#eef8ff",
+      footer: "CRUZEIRO DO SUL · PÓS-EAD"
+    }),
+    unibf: Object.freeze({
+      name: "UniBF",
+      shortName: "UniBF",
+      logo: "assets/brands/unibf.svg",
+      themeColor: "#eef6f5",
+      footer: "UNIBF · CENTRO UNIVERSITÁRIO"
+    }),
+    uninter: Object.freeze({
+      name: "UNINTER",
+      shortName: "UNINTER",
+      logo: "assets/brands/uninter.svg",
+      themeColor: "#f5f7fb",
+      footer: "CENTRO UNIVERSITÁRIO INTERNACIONAL UNINTER"
+    }),
+    sumare: Object.freeze({
+      name: "Sumaré EAD",
+      shortName: "Sumaré",
+      logo: "assets/brands/sumare.svg",
+      themeColor: "#f1f5f7",
+      footer: "CENTRO UNIVERSITÁRIO SUMARÉ · EAD"
+    }),
+    unicesumar: Object.freeze({
+      name: "UniCesumar",
+      shortName: "UniCesumar",
+      logo: "assets/brands/unicesumar.svg",
+      themeColor: "#f1f8fb",
+      footer: "UNICESUMAR · EDUCAÇÃO A DISTÂNCIA"
+    })
+  });
 
   const DEFAULT_CARD = Object.freeze({
     studentName: "Aluno(a) Exemplo",
     course: "Neuropsicologia",
     registration: "00000000-0",
     validUntil: "12/2029",
-    university: UNIVERSITY,
+    university: DEFAULT_UNIVERSITY,
     photoPath: "",
     photoUrl: "",
     localPhoto: ""
@@ -40,6 +77,12 @@
     courseNameLabel: document.getElementById("courseNameLabel"),
     courseStudentLabel: document.getElementById("courseStudentLabel"),
     courseRegistrationLabel: document.getElementById("courseRegistrationLabel"),
+    courseUniversityLabel: document.getElementById("courseUniversityLabel"),
+    headerUniversityLogo: document.getElementById("headerUniversityLogo"),
+    authUniversityLogo: document.getElementById("authUniversityLogo"),
+    cardUniversityLogo: document.getElementById("cardUniversityLogo"),
+    cardInstitutionLabel: document.getElementById("cardInstitutionLabel"),
+    themeColorMeta: document.getElementById("themeColorMeta"),
     cardStudentName: document.getElementById("cardStudentName"),
     cardCourseName: document.getElementById("cardCourseName"),
     cardRegistration: document.getElementById("cardRegistration"),
@@ -48,6 +91,7 @@
     studentPhoto: document.getElementById("studentPhoto"),
     studentInitial: document.getElementById("studentInitial"),
     profileForm: document.getElementById("profileForm"),
+    universitySelect: document.getElementById("universitySelect"),
     studentNameInput: document.getElementById("studentNameInput"),
     courseInput: document.getElementById("courseInput"),
     registrationInput: document.getElementById("registrationInput"),
@@ -137,6 +181,35 @@
     return Math.min(Math.max(value, min), max);
   }
 
+  function normalizeUniversity(value) {
+    const candidate = String(value || "").trim();
+    if (UNIVERSITIES[candidate]) return candidate;
+    const byName = Object.entries(UNIVERSITIES).find(([, item]) => item.name.toLowerCase() === candidate.toLowerCase());
+    return byName?.[0] || DEFAULT_UNIVERSITY;
+  }
+
+  function currentUniversity() {
+    return UNIVERSITIES[normalizeUniversity(cardData.university)];
+  }
+
+  function applyUniversityTheme(universityKey, remember = true) {
+    const key = normalizeUniversity(universityKey);
+    const university = UNIVERSITIES[key];
+    cardData.university = key;
+    document.documentElement.dataset.university = key;
+    if (els.themeColorMeta) els.themeColorMeta.content = university.themeColor;
+    if (els.headerUniversityLogo) els.headerUniversityLogo.src = university.logo;
+    if (els.authUniversityLogo) els.authUniversityLogo.src = university.logo;
+    if (els.cardUniversityLogo) {
+      els.cardUniversityLogo.src = university.logo;
+      els.cardUniversityLogo.alt = university.name;
+    }
+    if (els.courseUniversityLabel) els.courseUniversityLabel.textContent = university.name;
+    if (els.cardInstitutionLabel) els.cardInstitutionLabel.textContent = university.footer;
+    document.title = `Portal Acadêmico · ${university.shortName}`;
+    if (remember) localStorage.setItem("portal-carteirinhas:last-university", key);
+  }
+
   function randomInteger(max) {
     if (window.crypto?.getRandomValues) {
       const value = new Uint32Array(1);
@@ -207,6 +280,7 @@
   }
 
   function fillProfileForm() {
+    els.universitySelect.value = normalizeUniversity(cardData.university);
     els.studentNameInput.value = cardData.studentName;
     els.courseInput.value = cardData.course;
     els.registrationInput.value = cardData.registration;
@@ -214,6 +288,7 @@
   }
 
   function syncCardDataFromProfileForm() {
+    const university = normalizeUniversity(els.universitySelect.value);
     const studentName = els.studentNameInput.value.trim();
     const course = els.courseInput.value.trim();
     const registration = els.registrationInput.value.trim();
@@ -223,10 +298,11 @@
     if (course) cardData.course = course;
     if (registration) cardData.registration = registration;
     if (validUntil) cardData.validUntil = validUntil;
-    cardData.university = UNIVERSITY;
+    cardData.university = university;
   }
 
   function renderCard() {
+    applyUniversityTheme(cardData.university);
     els.cardStudentName.textContent = cardData.studentName;
     els.cardCourseName.textContent = cardData.course;
     els.cardRegistration.textContent = cardData.registration;
@@ -271,7 +347,7 @@
       course: cardData.course,
       registration: cardData.registration,
       validUntil: cardData.validUntil,
-      university: UNIVERSITY,
+      university: normalizeUniversity(cardData.university),
       photoPath: cardData.photoPath || "",
       localPhoto: cardData.localPhoto || ""
     }));
@@ -281,7 +357,7 @@
     try {
       const saved = JSON.parse(localStorage.getItem(localKey()) || "null");
       cardData = saved && typeof saved === "object"
-        ? { ...DEFAULT_CARD, ...saved, university: UNIVERSITY, photoUrl: "" }
+        ? { ...DEFAULT_CARD, ...saved, university: normalizeUniversity(saved.university), photoUrl: "" }
         : { ...DEFAULT_CARD };
     } catch {
       cardData = { ...DEFAULT_CARD };
@@ -327,7 +403,7 @@
       course: data.course_name || DEFAULT_CARD.course,
       registration: data.registration_number || DEFAULT_CARD.registration,
       validUntil: data.valid_until || DEFAULT_CARD.validUntil,
-      university: UNIVERSITY,
+      university: normalizeUniversity(data.university),
       photoPath: data.photo_path || "",
       localPhoto: "",
       photoUrl: ""
@@ -347,7 +423,7 @@
       course_name: cardData.course,
       registration_number: cardData.registration,
       valid_until: cardData.validUntil,
-      university: UNIVERSITY,
+      university: normalizeUniversity(cardData.university),
       photo_path: cardData.photoPath || null,
       updated_at: new Date().toISOString()
     };
@@ -699,7 +775,9 @@
     if (!isDemo && supabaseClient) await supabaseClient.auth.signOut();
     currentUser = null;
     isDemo = false;
-    cardData = { ...DEFAULT_CARD };
+    const rememberedUniversity = normalizeUniversity(localStorage.getItem("portal-carteirinhas:last-university"));
+    cardData = { ...DEFAULT_CARD, university: rememberedUniversity };
+    applyUniversityTheme(rememberedUniversity, false);
     showAuth();
   }
 
@@ -711,6 +789,11 @@
     els.googleLoginButton.addEventListener("click", signInWithGoogle);
     els.demoLoginButton.addEventListener("click", () => enterSession({ id: "demo", email: "modo@demonstracao.local", user_metadata: {} }, true));
     els.logoutButton.addEventListener("click", logout);
+    els.universitySelect.addEventListener("change", () => {
+      cardData.university = normalizeUniversity(els.universitySelect.value);
+      applyUniversityTheme(cardData.university);
+      showToast(`Identidade visual alterada para ${currentUniversity().name}. Salve para confirmar.`);
+    });
     els.studentPhotoInput.addEventListener("change", () => openPhotoCropper(els.studentPhotoInput.files?.[0]));
     els.removePhotoButton.addEventListener("click", removePhoto);
     els.randomRegistrationButton.addEventListener("click", () => {
@@ -745,11 +828,11 @@
 
     els.profileForm.addEventListener("submit", async (event) => {
       event.preventDefault();
+      cardData.university = normalizeUniversity(els.universitySelect.value);
       cardData.studentName = els.studentNameInput.value.trim();
       cardData.course = els.courseInput.value.trim();
       cardData.registration = els.registrationInput.value.trim();
       cardData.validUntil = els.validUntilInput.value.trim();
-      cardData.university = UNIVERSITY;
       await persistCard("Informações da carteirinha salvas.");
     });
 
@@ -816,6 +899,9 @@
   }
 
   async function init() {
+    const rememberedUniversity = normalizeUniversity(localStorage.getItem("portal-carteirinhas:last-university"));
+    cardData.university = rememberedUniversity;
+    applyUniversityTheme(rememberedUniversity, false);
     bindEvents();
     showAuth();
 

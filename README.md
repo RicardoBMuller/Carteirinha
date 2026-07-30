@@ -1,105 +1,69 @@
-# Portal Acadêmico — Carteirinhas V3
+# Portal Acadêmico Multiuniversidades — V4
 
-Portal particular para exibir duas carteirinhas estudantis separadas por conta Google.
+Portal particular de carteirinhas estudantis, com login Google, armazenamento no mesmo projeto Supabase do Portal FCC e identidade visual dinâmica.
 
-## Alterações desta versão
+## Novidade desta versão
 
-- ao selecionar a foto, abre uma tela de enquadramento;
-- é possível arrastar a imagem e controlar o zoom antes de salvar;
-- a prévia mostra exatamente o recorte quadrado usado na carteirinha;
-- foi adicionada a opção **Gerar** para criar um RGM aleatório no formato `00000000-0`;
-- os textos auxiliares acima e abaixo da carteirinha foram removidos;
+Na tela **Perfil**, o estudante pode escolher uma das instituições:
 
-- a carteirinha agora é vertical, inspirada no modelo da Cruzeiro do Sul Virtual;
-- não existe mais upload da imagem inteira da carteirinha;
-- o upload serve somente para a foto do estudante;
-- a foto é exibida no quadrado central da carteirinha;
-- a edição foi movida integralmente para o botão **Perfil**;
-- campos editáveis: Nome do Aluno, Curso, Matrícula/RGM e Validade;
-- a instituição permanece fixa como **Cruzeiro do Sul Virtual**;
-- o avatar do menu inferior continua usando a foto da conta Google;
-- cada conta acessa somente a própria carteirinha.
+- Cruzeiro do Sul Virtual
+- UniBF
+- UNINTER
+- Sumaré EAD
+- UniCesumar
 
-## Reutilização do Portal FCC
+A escolha altera imediatamente:
 
-Não é necessário criar outro projeto no Google Cloud e nem outro projeto no Supabase.
+- cores e fundos do aplicativo;
+- botões, menu inferior, cards e destaques;
+- logotipo do cabeçalho;
+- logotipo e acabamento da carteirinha;
+- nome da instituição na tela inicial e no rodapé da carteirinha.
 
-O `index.html` carrega diretamente o arquivo público:
+A universidade selecionada é salva junto com os demais dados da carteirinha e fica separada por conta Google.
 
-`https://ricardobmuller.github.io/Portal-FCC/config.js`
+## Recursos mantidos
 
-O arquivo `js/config.js` reutiliza:
+- login Google reutilizando o mesmo Google OAuth do Portal FCC;
+- mesmo banco Supabase `calculadora-fcc`;
+- edição de nome, curso, RGM e validade;
+- geração aleatória do RGM;
+- upload somente da foto do estudante;
+- enquadramento, arraste e zoom da foto;
+- PWA instalável e compatível com GitHub Pages;
+- políticas RLS: cada usuário acessa somente os próprios dados.
 
-- `SUPABASE_URL`;
-- `SUPABASE_PUBLISHABLE_KEY` ou a antiga `SUPABASE_ANON_KEY`.
+## Atualização do Supabase
 
-O Google Client ID e o Google Client Secret continuam somente no Supabase. Eles não são colocados neste projeto.
+Quem já executou o SQL da V2 ou V3 **não precisa criar outra tabela**. A coluna `university` já existe.
 
-## 1. Atualizar o mesmo Supabase
+O arquivo `supabase/ATUALIZAR_MESMO_BANCO_FCC.sql` continua incluído para instalação nova e também ajusta o valor padrão da universidade sem apagar registros.
 
-Abra o projeto **calculadora-fcc** e entre em:
+## Publicação no GitHub Pages
 
-`SQL Editor > New query`
+1. Extraia o ZIP.
+2. Coloque o conteúdo da pasta no repositório.
+3. Faça commit e push.
+4. Em **Settings → Pages**, publique pela branch principal e pasta raiz.
+5. No Supabase, mantenha a URL do GitHub Pages em **Authentication → URL Configuration → Redirect URLs**.
 
-Execute todo o arquivo:
+O projeto continua carregando a configuração compartilhada em:
 
-`supabase/ATUALIZAR_MESMO_BANCO_FCC.sql`
-
-O arquivo é não destrutivo. Ele não apaga nem altera projetos, salas, cartões de prova ou dados do Kanban.
-
-Ele cria somente:
-
-- tabela `public.fcc_student_cards`;
-- bucket privado `fcc-student-card-photos`;
-- políticas RLS para cada usuário acessar somente os próprios dados.
-
-## 2. Adicionar a nova URL no Supabase Auth
-
-No mesmo projeto Supabase, abra:
-
-`Authentication > URL Configuration`
-
-Não é necessário substituir a Site URL atual do Portal FCC.
-
-Em **Redirect URLs**, adicione a URL final deste novo GitHub Pages. Exemplo:
-
-`https://ricardobmuller.github.io/Portal-Carteirinhas/**`
-
-Para teste local com Live Server, mantenha ou adicione:
-
-- `http://127.0.0.1:5500/**`
-- `http://localhost:5500/**`
-
-## 3. Google Cloud
-
-Não crie outro projeto e não crie outro OAuth Client.
-
-A origem autorizada já utilizada continua a mesma:
-
-`https://ricardobmuller.github.io`
-
-A callback do Google continua sendo a mesma callback do projeto Supabase `calculadora-fcc`.
-
-## 4. Publicar no GitHub Pages
-
-Envie todos os arquivos deste ZIP para a raiz do novo repositório.
-
-Depois abra:
-
-`Settings > Pages`
-
-Configure:
-
-- Source: `Deploy from a branch`;
-- Branch: `main`;
-- Folder: `/(root)`.
+```text
+https://ricardobmuller.github.io/Portal-FCC/config.js
+```
 
 ## Estrutura
 
-- `index.html` — telas e template vertical;
-- `css/styles.css` — identidade visual e responsividade;
-- `js/app.js` — login, navegação, edição, enquadramento da foto, banco e upload;
-- `js/config.js` — ponte para reutilizar o config do Portal FCC;
-- `supabase/ATUALIZAR_MESMO_BANCO_FCC.sql` — migração não destrutiva;
-- `supabase/VERIFICAR_INSTALACAO.sql` — conferência opcional;
-- `manifest.webmanifest` e `sw.js` — instalação como PWA.
+```text
+assets/brands/       Logos vetoriais locais das cinco universidades
+css/styles.css       Layout e temas dinâmicos
+js/app.js            Login, perfil, persistência, foto e seleção de universidade
+supabase/             SQL não destrutivo
+index.html            Aplicação
+sw.js                 Cache PWA
+```
+
+## Observação de marca
+
+As marcas e nomes pertencem às respectivas instituições. Os arquivos vetoriais deste projeto são representações locais para uso particular, baseadas nas identidades visuais públicas, e não indicam vínculo ou endosso institucional.

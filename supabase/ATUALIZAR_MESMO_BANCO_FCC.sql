@@ -17,7 +17,7 @@ create table if not exists public.fcc_student_cards (
   course_name text not null default 'Neuropsicologia',
   registration_number text not null default '00000000-0',
   valid_until text not null default '12/2029',
-  university text not null default 'Cruzeiro do Sul Virtual',
+  university text not null default 'cruzeiro',
   photo_path text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -123,3 +123,9 @@ select
     from pg_class
     where oid = 'public.fcc_student_cards'::regclass
   ) as rls_ativo;
+
+
+-- Compatibilidade com a versão multiuniversidades.
+-- Mantém registros existentes e muda apenas o valor padrão para novos perfis.
+alter table public.fcc_student_cards
+  alter column university set default 'cruzeiro';
