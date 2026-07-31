@@ -308,32 +308,56 @@
     }
   }
 
+  function createGentleVisualTheme(colors = DEFAULT_COLORS) {
+    const brandPrimary = normalizeBrandTone(colors.primary, DEFAULT_COLORS.primary);
+    const brandSecondary = normalizeBrandTone(colors.accent || colors.secondary, DEFAULT_COLORS.accent);
+    const brandRgb = hexToRgb(brandPrimary) || { r: 21, g: 90, b: 145 };
+
+    return {
+      brandPrimary,
+      brandSecondary,
+      brandRgb,
+      background: mixHex(DEFAULT_COLORS.background, brandPrimary, 4),
+      backgroundEnd: mixHex(DEFAULT_COLORS.backgroundEnd, brandSecondary, 3),
+      backgroundSoft: DEFAULT_COLORS.backgroundSoft,
+      cardStart: mixHex(DEFAULT_COLORS.cardStart, brandPrimary, 8),
+      cardEnd: mixHex(DEFAULT_COLORS.cardEnd, brandSecondary, 8),
+      cardLine: hexToRgba(brandPrimary, .22),
+      brandSoft: mixHex(brandPrimary, "#ffffff", 92)
+    };
+  }
+
   function applyCssVariables(colors) {
     const root = document.documentElement;
-    const primaryRgb = hexToRgb(colors.primary) || { r: 21, g: 90, b: 145 };
+    const gentle = createGentleVisualTheme(colors);
+    const baseRgb = hexToRgb(DEFAULT_COLORS.primary) || { r: 21, g: 90, b: 145 };
     const variables = {
-      "--bg": colors.background,
-      "--bg-end": colors.backgroundEnd,
-      "--bg-soft": colors.backgroundSoft,
+      "--bg": gentle.background,
+      "--bg-end": gentle.backgroundEnd,
+      "--bg-soft": gentle.backgroundSoft,
       "--ink": "#102b42",
-      "--muted": mixHex(colors.primary, "#6b8091", 72),
-      "--blue": colors.primary,
-      "--blue-2": colors.secondary,
-      "--cyan": colors.accent,
-      "--accent": colors.accent,
-      "--line": `rgba(${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}, .14)`,
-      "--shadow-rgb": `${primaryRgb.r}, ${primaryRgb.g}, ${primaryRgb.b}`,
-      "--header-surface": "rgba(255,255,255,.89)",
-      "--nav-surface": "rgba(250,252,255,.95)",
+      "--muted": "#668096",
+      "--blue": DEFAULT_COLORS.primary,
+      "--blue-2": DEFAULT_COLORS.secondary,
+      "--cyan": DEFAULT_COLORS.accent,
+      "--accent": DEFAULT_COLORS.accent,
+      "--brand-primary": gentle.brandPrimary,
+      "--brand-secondary": gentle.brandSecondary,
+      "--brand-soft": gentle.brandSoft,
+      "--brand-line": `rgba(${gentle.brandRgb.r}, ${gentle.brandRgb.g}, ${gentle.brandRgb.b}, .18)`,
+      "--line": `rgba(${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}, .14)`,
+      "--shadow-rgb": `${baseRgb.r}, ${baseRgb.g}, ${baseRgb.b}`,
+      "--header-surface": "rgba(249,253,255,.89)",
+      "--nav-surface": "rgba(246,251,255,.95)",
       "--hero-1": "rgba(255,255,255,.98)",
-      "--hero-2": hexToRgba(colors.background, .86),
-      "--soft-tint": mixHex(colors.primary, "#ffffff", 88),
-      "--soft-tint-2": mixHex(colors.accent, "#ffffff", 90),
-      "--card-bg-1": colors.cardStart,
-      "--card-bg-2": colors.cardEnd,
-      "--card-ink": colors.cardInk,
-      "--card-muted": colors.cardMuted,
-      "--card-line": hexToRgba(colors.accent, .38)
+      "--hero-2": hexToRgba(gentle.background, .86),
+      "--soft-tint": mixHex(DEFAULT_COLORS.primary, "#ffffff", 88),
+      "--soft-tint-2": gentle.brandSoft,
+      "--card-bg-1": gentle.cardStart,
+      "--card-bg-2": gentle.cardEnd,
+      "--card-ink": DEFAULT_COLORS.cardInk,
+      "--card-muted": DEFAULT_COLORS.cardMuted,
+      "--card-line": gentle.cardLine
     };
     Object.entries(variables).forEach(([name, value]) => root.style.setProperty(name, value));
   }
@@ -344,7 +368,7 @@
     document.documentElement.dataset.university = university.entityId || (university.name ? "custom" : "blank");
     applyCssVariables(university.colors);
 
-    if (els.themeColorMeta) els.themeColorMeta.content = university.colors.background;
+    if (els.themeColorMeta) els.themeColorMeta.content = DEFAULT_COLORS.background;
     setUniversityLogo(els.headerUniversityLogo, null, university);
     setUniversityLogo(els.authUniversityLogo, null, university);
     setUniversityLogo(els.cardUniversityLogo, null, university);
@@ -402,6 +426,20 @@
     return relativeLuminance(background) > .48 ? dark : light;
   }
 
+  function normalizeBrandTone(value, fallback) {
+    let color = normalizeHex(value, fallback);
+    let luminance = relativeLuminance(color);
+
+    // Cores institucionais muito claras somem no branco; as muito escuras pesam na interface.
+    // O logo permanece original, mas os pequenos detalhes visuais recebem uma versão equilibrada.
+    if (luminance > .56) {
+      color = mixHex(color, "#102b42", 34);
+      luminance = relativeLuminance(color);
+    }
+    if (luminance < .075) color = mixHex(color, "#ffffff", 22);
+    return color;
+  }
+
   function rgbToHsl(r, g, b) {
     const rn = r / 255;
     const gn = g / 255;
@@ -454,21 +492,18 @@
     }
     const primaryIsLight = relativeLuminance(primary) > .53;
     const secondary = primaryIsLight ? mixHex(primary, "#000000", 28) : mixHex(primary, "#ffffff", 18);
-    const cardStart = primaryIsLight ? mixHex(primary, "#ffffff", 62) : mixHex(primary, "#ffffff", 5);
-    const cardEnd = primaryIsLight ? mixHex(primary, "#ffffff", 42) : mixHex(primary, "#000000", 24);
-    const cardInk = contrastText(cardEnd);
-    const cardMuted = cardInk === "#ffffff" ? mixHex("#ffffff", cardEnd, 24) : mixHex(cardInk, cardEnd, 48);
+    const gentle = createGentleVisualTheme({ primary, secondary, accent });
     return {
       primary,
       secondary,
       accent,
-      background: mixHex(primary, "#ffffff", 91),
-      backgroundEnd: mixHex(primary, "#ffffff", 84),
-      backgroundSoft: mixHex(primary, "#ffffff", 97),
-      cardStart,
-      cardEnd,
-      cardInk,
-      cardMuted
+      background: gentle.background,
+      backgroundEnd: gentle.backgroundEnd,
+      backgroundSoft: gentle.backgroundSoft,
+      cardStart: gentle.cardStart,
+      cardEnd: gentle.cardEnd,
+      cardInk: DEFAULT_COLORS.cardInk,
+      cardMuted: DEFAULT_COLORS.cardMuted
     };
   }
 
@@ -1347,10 +1382,11 @@
       span.title = color;
       els.universityColorSwatches.appendChild(span);
     });
-    els.universityMiniPreview.style.setProperty("--preview-primary", university.colors.primary);
-    els.universityMiniPreview.style.setProperty("--preview-accent", university.colors.accent);
-    els.universityMiniPreview.style.setProperty("--preview-bg", university.colors.background);
-    els.universityMiniPreview.style.setProperty("--preview-card", university.colors.cardStart);
+    const gentlePreview = createGentleVisualTheme(university.colors);
+    els.universityMiniPreview.style.setProperty("--preview-primary", gentlePreview.brandPrimary);
+    els.universityMiniPreview.style.setProperty("--preview-accent", gentlePreview.brandSecondary);
+    els.universityMiniPreview.style.setProperty("--preview-bg", gentlePreview.background);
+    els.universityMiniPreview.style.setProperty("--preview-card", gentlePreview.cardStart);
     const miniLogo = els.universityMiniPreview.querySelector("img");
     const miniInitial = els.universityMiniPreview.querySelector("span");
     setUniversityLogo(miniLogo, miniInitial, university);

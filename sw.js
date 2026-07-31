@@ -1,10 +1,10 @@
-const CACHE_NAME = "portal-carteirinhas-v8-busca-universidade-aprimorada";
+const CACHE_NAME = "portal-carteirinhas-v9-identidade-suave";
 const LOCAL_ASSETS = [
   "./",
   "./index.html",
-  "./css/styles.css?v=8.0",
-  "./js/config.js?v=8.0",
-  "./js/app.js?v=8.0",
+  "./css/styles.css?v=9.0",
+  "./js/config.js?v=9.0",
+  "./js/app.js?v=9.0",
   "./manifest.webmanifest",
   "./assets/favicon.svg",
   "./assets/icon-192.png",

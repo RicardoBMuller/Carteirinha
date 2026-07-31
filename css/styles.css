@@ -10,6 +10,10 @@
   --blue-2: #1c78b0;
   --cyan: #67c5d5;
   --accent: #67c5d5;
+  --brand-primary: #155a91;
+  --brand-secondary: #67c5d5;
+  --brand-soft: #edf7fc;
+  --brand-line: rgba(21, 90, 145, .18);
   --line: rgba(24, 92, 139, 0.13);
   --shadow-rgb: 28, 80, 120;
   --shadow: 0 20px 50px rgba(var(--shadow-rgb), 0.12);
@@ -40,8 +44,8 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at 7% 8%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 30%),
-    radial-gradient(circle at 96% 18%, color-mix(in srgb, var(--blue-2) 18%, transparent), transparent 28%),
+    radial-gradient(circle at 7% 8%, color-mix(in srgb, var(--brand-primary) 8%, transparent), transparent 30%),
+    radial-gradient(circle at 96% 18%, color-mix(in srgb, var(--brand-secondary) 6%, transparent), transparent 28%),
     linear-gradient(180deg, var(--bg-soft) 0%, var(--bg) 55%, var(--bg-end) 100%);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -405,13 +409,14 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 
 
 /* =========================================================
-   IDENTIDADE VISUAL DINÂMICA
-   As variáveis são calculadas a partir do logo selecionado.
+   IDENTIDADE VISUAL INSTITUCIONAL SUAVE
+   A interface mantém a base clara da Cruzeiro do Sul.
+   A universidade escolhida altera apenas logo e detalhes sutis.
    ========================================================= */
 body {
   background:
-    radial-gradient(circle at 7% 8%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 30%),
-    radial-gradient(circle at 96% 18%, color-mix(in srgb, var(--blue-2) 18%, transparent), transparent 28%),
+    radial-gradient(circle at 7% 8%, color-mix(in srgb, var(--brand-primary) 8%, transparent), transparent 30%),
+    radial-gradient(circle at 96% 18%, color-mix(in srgb, var(--brand-secondary) 6%, transparent), transparent 28%),
     linear-gradient(180deg, var(--bg-soft) 0%, var(--bg) 55%, var(--bg-end) 100%);
   transition: background .35s ease, color .35s ease;
 }
@@ -423,9 +428,14 @@ body {
 .topbar { border-color: var(--line); box-shadow: 0 12px 35px rgba(var(--shadow-rgb), .10); }
 .hero-panel::before, .hero-panel::after { border-color: color-mix(in srgb, var(--blue-2) 20%, transparent); }
 .hero-mark { border-color: color-mix(in srgb, var(--blue-2) 22%, transparent); }
-.hero-mark span { border-color: var(--accent); }
+.hero-mark span { border-color: var(--brand-primary); }
 .course-icon, .primary-button, .nav-item.active .nav-icon {
-  background: linear-gradient(145deg, var(--blue), var(--accent));
+  color: #ffffff;
+  background: linear-gradient(145deg, var(--blue), var(--blue-2));
+}
+.primary-button:focus-visible, .nav-item:focus-visible, .field-action-button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand-primary) 24%, white);
+  outline-offset: 2px;
 }
 .course-icon { box-shadow: 0 12px 24px rgba(var(--shadow-rgb), .22); }
 .quick-icon, .date-box { background: var(--soft-tint); }
@@ -433,7 +443,18 @@ body {
   color: var(--card-ink);
   border-color: var(--card-line);
   background: linear-gradient(145deg, var(--card-bg-1), var(--card-bg-2));
-  box-shadow: 0 28px 65px rgba(var(--shadow-rgb), .22);
+  box-shadow: 0 28px 65px rgba(var(--shadow-rgb), .18);
+}
+.student-card::after {
+  content: "";
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 7px;
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary));
+  opacity: .72;
 }
 .student-card__identity span, .student-card__details span, .student-card__institution span { color: var(--card-muted); }
 .student-card__rule { background: color-mix(in srgb, var(--card-ink) 28%, transparent); }
@@ -443,9 +464,9 @@ body {
   min-height: 76px;
   padding: 8px 14px;
   place-items: center;
-  border: 1px solid rgba(255,255,255,.52);
+  border: 1px solid var(--brand-line);
   border-radius: 17px;
-  background: rgba(255,255,255,.92);
+  background: rgba(255,255,255,.94);
   box-shadow: 0 9px 24px rgba(15,39,57,.08);
 }
 .university-lockup img { width: min(100%, 285px); max-height: 62px; object-fit: contain; }
@@ -477,7 +498,7 @@ body {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 18px;
-  background: linear-gradient(145deg, rgba(255,255,255,.95), color-mix(in srgb, var(--soft-tint) 68%, white));
+  background: linear-gradient(145deg, rgba(255,255,255,.97), color-mix(in srgb, var(--brand-soft) 54%, white));
 }
 .selected-university.is-empty { border-style: dashed; }
 .selected-university__logo {
@@ -635,11 +656,11 @@ body {
 .mini-preview__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .mini-preview__top > div { display: grid; width: 54px; height: 37px; overflow: hidden; place-items: center; border-radius: 9px; color: var(--preview-primary); background: white; font-size: .58rem; font-weight: 900; }
 .mini-preview__top img { width: calc(100% - 6px); max-height: 31px; object-fit: contain; }
-.mini-preview__top i { width: 27px; height: 27px; border-radius: 9px; background: linear-gradient(145deg, var(--preview-primary), var(--preview-accent)); }
+.mini-preview__top i { width: 27px; height: 27px; border-radius: 9px; background: linear-gradient(145deg, #155a91, #1c78b0); }
 .university-mini-preview strong, .university-mini-preview small { display: block; }
 .university-mini-preview strong { font-size: .77rem; }
 .university-mini-preview small { margin-top: 3px; color: #647d8f; font-size: .6rem; }
-.university-mini-preview b { position: absolute; left: 13px; right: 13px; bottom: 12px; height: 7px; border-radius: 99px; background: linear-gradient(90deg, var(--preview-primary), var(--preview-accent)); }
+.university-mini-preview b { position: absolute; left: 13px; right: 13px; bottom: 12px; height: 7px; border-radius: 99px; background: linear-gradient(90deg, var(--preview-primary), var(--preview-accent)); opacity: .72; }
 .university-modal-actions { display: grid; grid-template-columns: .8fr 1.35fr; gap: 10px; margin-top: 18px; }
 .university-modal-actions .primary-button, .university-modal-actions .secondary-button { width: 100%; min-height: 50px; margin: 0; }
 .university-modal-actions button:disabled { opacity: .55; cursor: not-allowed; }
